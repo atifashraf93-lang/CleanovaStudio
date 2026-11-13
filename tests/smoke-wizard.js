@@ -1,0 +1,24 @@
+const { chromium } = require('playwright');
+const M='/tmp/claude-0/st/media/';
+(async () => {
+  const b = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
+  const pg = await b.newPage({ viewport: { width: 400, height: 820 }, deviceScaleFactor: 1 });
+  const errs = []; pg.on('pageerror', e => errs.push('PAGEERR ' + e.message)); pg.on('console', m => { if (m.type() === 'error') errs.push('CONSOLE ' + m.text()); });
+  await pg.goto('http://localhost:8150/index.html'); await pg.waitForSelector('#nw');
+  await pg.screenshot({ path: '/tmp/claude-0/st/home.png' });
+  await pg.click('#nw'); await pg.waitForSelector('#fi', { state: 'attached' });
+  await pg.setInputFiles('#fi', ['v1.webm','v2.webm','i1.jpg','i2.jpg','i3.jpg','i4.jpg','i5.jpg'].map(f => M + f));
+  await pg.waitForFunction(() => document.querySelectorAll('.tile[data-i]').length === 7 && !document.querySelector('.spin'), null, { timeout: 60000 });
+  console.log('tiles', await pg.$$eval('.tile[data-i]', e => e.length));
+  await pg.screenshot({ path: '/tmp/claude-0/st/wiz1.png' });
+  await pg.fill('#scr', 'Hamari Murree ki safar\nSubah ki thandi hawa\nBachon ki masti\nPahadon ka nazara\nAllah ka shukar hai');
+  await pg.screenshot({ path: '/tmp/claude-0/st/wiz2.png', fullPage: false });
+  await pg.click('#go');
+  await pg.waitForSelector('#cv', { timeout: 60000 });
+  await pg.waitForTimeout(1500);
+  const info = await pg.evaluate(() => { const s = Studio.app.editorState(); return { dur: s.p.dur, clips: s.p.clips.map(c => [c.kind, +c.t0.toFixed(2), +c.len.toFixed(2), c.trans.type]), texts: s.p.texts.map(t => [t.text, t.at, +t._t0.toFixed(1), +t._t1.toFixed(1)]), style: s.p.style, music: s.p.music.mood, ov: s.p.overlay }; });
+  console.log(JSON.stringify(info));
+  await pg.screenshot({ path: '/tmp/claude-0/st/ed1.png' });
+  console.log('ERRS', JSON.stringify(errs));
+  await b.close();
+})().catch(e => { console.error('FAIL', e); process.exit(1); });

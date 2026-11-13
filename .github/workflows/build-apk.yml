@@ -1,0 +1,116 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Prepare web folder
+        run: |
+          mkdir -p www
+          cp index.html style.css core.js fx.js music.js engine.js auto.js ai.js stats.js updater.js app.js editor.js manifest.webmanifest icon.svg icon-192.png icon-512.png www/
+          cp -r fonts www/fonts
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Native plugins and activity
+        run: |
+          D=android/app/src/main/java/pk/smaa/cleanovastudio
+          mkdir -p $D
+          cp java/*.java $D/
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />\n</manifest>#' $M
+          sed -i 's#<application#<queries><intent><action android:name="android.intent.action.TTS_SERVICE" /></intent></queries>\n    <application#' $M
+          grep -n "RECORD_AUDIO\|TTS_SERVICE" $M
+
+      - name: Fixed signing key and version number (so new APKs update the old app)
+        run: |
+          mkdir -p ~/.android
+          cp smaa.keystore ~/.android/debug.keystore
+          sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"1.${{ github.run_number }}\"/" android/app/build.gradle
+          grep -n "versionCode\|versionName" android/app/build.gradle
+          cat >> android/app/build.gradle <<'GRADLE'
+          android {
+              signingConfigs {
+                  debug {
+                      storeFile file(System.getenv('GITHUB_WORKSPACE') + '/smaa.keystore')
+                      storePassword 'android'
+                      keyAlias 'androiddebugkey'
+                      keyPassword 'android'
+                  }
+              }
+          }
+          GRADLE
+
+      - name: App icons
+        run: |
+          RES=android/app/src/main/res
+          rm -rf $RES/mipmap-anydpi-v26
+          for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            for n in ic_launcher ic_launcher_round ic_launcher_foreground; do
+              cp www/icon-192.png $RES/mipmap-$d/$n.png
+            done
+          done
+
+      - name: Stamp build number
+        run: echo "window.SMAA_BUILD = ${{ github.run_number }};" > www/build.js
+
+      - name: Sync web files
+        run: npx cap sync android
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Rename APK and pack the web files (self-update bundle)
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk Cleanova-Studio.apk
+          cd android/app/src/main/assets/public && zip -qr "$GITHUB_WORKSPACE/www.zip" . && cd "$GITHUB_WORKSPACE" && ls -l www.zip Cleanova-Studio.apk
+
+      - name: Second download address for the web bundle (ota branch)
+        id: ota
+        continue-on-error: true
+        run: |
+          mkdir -p /tmp/ota && cp www.zip /tmp/ota/ && cd /tmp/ota
+          git init -q && git checkout -q -b ota
+          git config user.name "SMAA CI" && git config user.email "ci@users.noreply.github.com"
+          git add www.zip && git commit -q -m "web bundle ${{ github.run_number }}"
+          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git push -q -f origin ota
+          echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Publish APK as a release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: Cleanova Studio APK ${{ github.run_number }}
+          body: "need=1 sha=${{ steps.ota.outputs.sha }}"
+          files: |
+            Cleanova-Studio.apk
+            www.zip
