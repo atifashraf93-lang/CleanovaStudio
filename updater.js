@@ -3,7 +3,7 @@
    and switched in without reinstalling; native changes open the Android installer. */
 (function () {
   'use strict';
-  var REPO = 'atifashraf93-lang/cleanovastudio', K = 'smaa.upd.';
+  var REPO = 'atifashraf93-lang/CleanovaStudio', K = 'smaa.upd.';
   var BUILD = window.SMAA_BUILD || 0;
   if (!BUILD) return; /* browser / desktop copy: nothing to update */
   function g(k) { try { return JSON.parse(localStorage.getItem(K + k)); } catch (e) { return null; } }

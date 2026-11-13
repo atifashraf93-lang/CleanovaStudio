@@ -299,40 +299,59 @@
     }
 
     /* ---------- export ---------- */
-    static mime() {
-      const L = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
-      if (!window.MediaRecorder) return '';
-      for (const m of L) { try { if (MediaRecorder.isTypeSupported(m)) return m; } catch (e) { /* ignore */ } }
-      return '';
+    static mimes() {
+      const L = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+      if (!window.MediaRecorder) return [];
+      return L.filter(m => { try { return MediaRecorder.isTypeSupported(m); } catch (e) { return false; } });
     }
+    static mime() { return Engine.mimes()[0] || ''; }
     async exportVideo(o) {
+      const list = Engine.mimes(); if (!list.length) throw new Error('recorder');
+      /* try the best format first; if the phone's recorder fails, fall back to the next one */
+      const cands = [list.find(m => /mp4;codecs=avc1/.test(m)), list.find(m => m === 'video/mp4'), list.find(m => /webm/.test(m))].filter((m, i, a) => m && a.indexOf(m) === i); let last = null;
+      for (const m of cands) {
+        try { return await this._export(o, m); } catch (e) { last = e; if (e.message === 'cancelled' || e.kind !== 'rec') throw e; }
+      }
+      throw last || new Error('recorder');
+    }
+    async _export(o, mime) {
       o = o || {}; const p = this.p; if (!p) throw new Error('no project');
-      this.pause(); this.layoutAll(); const mime = Engine.mime(); if (!mime) throw new Error('recorder');
+      this.pause(); this.layoutAll();
       const prevShort = this.shortSide; this.exporting = true; this.sel = null; this.shortSide = o.res || p.res || 720; this.size(this.shortSide);
-      this.p.clips.forEach(c => { if (c.bmp) { try { c.bmp.close(); } catch (e) { /* ignore */ } c.bmp = null; } });
-      this.ensureAudio(); this.spk.gain.value = 0; this.stopAudio();
-      if (!this.recDest) { this.recDest = this.ac.createMediaStreamDestination(); this.master.connect(this.recDest); }
-      if (p.music.kind !== 'none') { try { await this.loadMusic(); } catch (e) { /* ignore */ } }
-      const stream = this.cv.captureStream(30); this.recDest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr));
-      const bps = this.W * this.H >= 1500000 ? 9e6 : 5.5e6;
-      const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: bps, audioBitsPerSecond: 128000 });
-      const chunks = []; rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
-      const stopped = new Promise(res => { rec.onstop = res; });
-      this.t = 0; this.prepare(0);
-      for (let i = 0; i < 60 && !this.ready(0); i++) { await S.sleep(100); this.prepare(0); }
-      this.render(0);
-      let cancelled = false; this._cancel = () => { cancelled = true; };
-      const done = new Promise(res => { this.onEnd = res; });
-      const prevTick = this.onTick;
-      this.onTick = t => { if (o.onProgress) o.onProgress(t / Math.max(.1, this.dur)); if (cancelled) { this.pause(); this.onEnd = null; } };
-      rec.start(1000); await this.play();
-      await Promise.race([done, new Promise(res => { const iv = setInterval(() => { if (cancelled) { clearInterval(iv); res(); } }, 200); done.then(() => clearInterval(iv)); })]);
-      await S.sleep(180); try { rec.stop(); } catch (e) { /* ignore */ }
-      await stopped; this.onTick = prevTick; this.onEnd = null; this.exporting = false; this.spk.gain.value = 1;
-      this.shortSide = prevShort; this.size(prevShort); this.t = 0; this.invalidate();
-      if (cancelled) throw new Error('cancelled');
-      const type = (mime.split(';')[0]) || 'video/mp4';
-      return { blob: new Blob(chunks, { type }), mime: type, ext: type.indexOf('mp4') >= 0 ? 'mp4' : 'webm' };
+      let cancelled = false, recErr = null; this._cancel = () => { cancelled = true; };
+      const prevTick = this.onTick; let rec = null;
+      try {
+        this.p.clips.forEach(c => { if (c.bmp) { try { c.bmp.close(); } catch (e) { /* ignore */ } c.bmp = null; } });
+        this.ensureAudio(); this.spk.gain.value = 0; this.stopAudio();
+        if (!this.recDest) { this.recDest = this.ac.createMediaStreamDestination(); this.master.connect(this.recDest); }
+        if (p.music.kind !== 'none') { try { await this.loadMusic(); } catch (e) { /* ignore */ } }
+        const stream = this.cv.captureStream(30); this.recDest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr));
+        const bps = this.W * this.H >= 1500000 ? 9e6 : 5.5e6;
+        rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: bps, audioBitsPerSecond: 128000 });
+        const chunks = []; rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+        rec.onerror = e => { recErr = (e && e.error) || e || new Error('rec'); };
+        const stopped = new Promise(res => { rec.onstop = res; });
+        this.t = 0; this.prepare(0);
+        for (let i = 0; i < 60 && !this.ready(0); i++) { await S.sleep(100); this.prepare(0); }
+        this.render(0);
+        const done = new Promise(res => { this.onEnd = () => res('ok'); });
+        this.onTick = t => { if (o.onProgress) o.onProgress(t / Math.max(.1, this.dur)); };
+        rec.start(1000); await this.play();
+        const w0 = Date.now(); let wd = 0;
+        const watch = new Promise(res => { wd = setInterval(() => { if (cancelled) res('cancel'); else if (recErr) res('fail'); else if (Date.now() - w0 > 10000 && !chunks.length) res('fail'); }, 300); });
+        const r = await Promise.race([done, watch]); clearInterval(wd);
+        if (r !== 'ok') { this.pause(); this.onEnd = null; } else await S.sleep(180);
+        try { if (rec.state !== 'inactive') rec.stop(); } catch (e) { /* ignore */ }
+        await Promise.race([stopped, S.sleep(4000)]);
+        if (r === 'cancel') throw new Error('cancelled');
+        if (r === 'fail' || recErr || !chunks.length) { const er = new Error('recorder failed'); er.kind = 'rec'; throw er; }
+        const type = (mime.split(';')[0]) || 'video/mp4';
+        return { blob: new Blob(chunks, { type }), mime: type, ext: type.indexOf('mp4') >= 0 ? 'mp4' : 'webm' };
+      } finally {
+        try { if (rec && rec.state !== 'inactive') rec.stop(); } catch (e) { /* ignore */ }
+        this.onTick = prevTick; this.onEnd = null; this.exporting = false; if (this.spk) this.spk.gain.value = 1;
+        this.shortSide = prevShort; this.size(prevShort); this.t = 0; this.invalidate();
+      }
     }
     cancelExport() { if (this._cancel) this._cancel(); }
   }
