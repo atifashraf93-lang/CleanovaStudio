@@ -17,7 +17,7 @@
     let r; const ctl = new AbortController(); let timedOut = false; const to = setTimeout(() => { timedOut = true; ctl.abort(); }, 75000); if (signal) signal.addEventListener('abort', () => ctl.abort());
     try {
       r = await fetch(BASE + 'models/' + model + ':generateContent', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': AI.key() }, body: JSON.stringify(body), signal: ctl.signal });
-    } catch (e) { clearTimeout(to); if (timedOut) throw err('busy', 'timeout'); throw err('net', 'network'); }
+    } catch (e) { clearTimeout(to); if (timedOut) throw err('busy', 'timeout'); throw err('net', String(e && e.message || 'network')); }
     clearTimeout(to);
     if (r.ok) return r.json();
     let msg = ''; try { const j = await r.json(); msg = (j.error && j.error.message) || ''; } catch (e) { /* ignore */ }
@@ -34,7 +34,7 @@
     for (let round = 0; round < 3; round++) {
       let hard = null;
       for (const m of models) {
-        try { return await post(m, body, signal); } catch (e) { last = e; if (e.kind === 'model' || e.kind === 'busy' || e.kind === 'limit') { if (e.kind !== 'model') hard = e; continue; } throw e; }
+        try { return await post(m, body, signal); } catch (e) { last = e; if (e.kind === 'model' || e.kind === 'busy' || e.kind === 'limit' || e.kind === 'net') { if (e.kind !== 'model') hard = e; continue; } throw e; }
       }
       if (!hard) break; if (round < 2) await S.sleep(3500 * (round + 1));
     }
@@ -162,7 +162,7 @@
       'Multi-line fields use \\n between lines. Keep every text short (titles under 6 words, list lines under 8 words). Each scene may also have "say": one natural sentence a narrator reads for that scene (in the same language).\n' +
       'Also pick "theme" from: neon, social, gold, green, news, promo, sunset, rose, ocean (green for religious, gold or rose for weddings, news for issues and awareness, promo for sales, neon or social for workshops and social media), and "mood" from: calm, happy, travel, emotional, islamic, epic, party. Give a short "name" for the project and "org" (the organisation or person name if stated, else "").\n' +
       'Return JSON only: {"name":"","org":"","theme":"","mood":"","ticker":"","scenes":[{"type":"","data":{},"say":""}]} where ticker is a news-ticker sentence only for news-style videos, else "".';
-    const ms = AI.models(); let lastE = null;
+    const ms = AI.models().slice().sort((a, b) => (/lite/.test(b) ? 1 : 0) - (/lite/.test(a) ? 1 : 0)); let lastE = null; /* lighter models answer faster, so the connection is less likely to drop */
     for (let i = 0; i < Math.min(3, ms.length); i++) {
       try {
         const j = await gen({ contents: [{ parts: [{ text: p }] }], generationConfig: { responseMimeType: 'application/json', temperature: .7, maxOutputTokens: 8192 } }, ms.slice(i), signal);
@@ -177,7 +177,7 @@
     if (k === 'key') return S.tt('AI کی (key) درست نہیں یا اس کی اجازت نہیں', 'The AI key is not valid or not allowed');
     if (k === 'limit') return S.tt('AI کی مفت حد پوری ہو گئی، کچھ دیر بعد کوشش کریں', 'AI free limit reached, try again in a while');
     if (k === 'busy') return S.tt('AI سرور پر ابھی بہت رش ہے (گوگل کی طرف سے)، ایک دو منٹ بعد دوبارہ دبائیں', 'The AI server is busy right now (Google side). Please press again in a minute or two');
-    if (k === 'net') return S.tt('انٹرنیٹ نہیں مل رہا', 'No internet connection');
+    if (k === 'net') return S.tt('AI سے رابطہ ٹوٹ گیا (انٹرنیٹ سست یا درمیان میں منقطع)۔ دوبارہ دبائیں', 'The connection to the AI dropped (slow or interrupted internet). Please press again');
     if (k === 'model') return S.tt('AI ماڈل نہیں ملا، Settings میں کی دوبارہ جانچیں', 'AI model not found, re-check the key in Settings');
     if (k === 'parse') return S.tt('AI کا جواب سمجھ نہیں آیا', 'Could not understand the AI answer');
     if (k === 'lang') return S.tt('فون میں اردو آواز نہیں ہے', 'The phone has no Urdu voice');
