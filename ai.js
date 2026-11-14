@@ -24,12 +24,18 @@
     if (r.status === 401 || r.status === 403) throw err('key', msg);
     if (r.status === 404) throw err('model', msg);
     if (r.status === 429) throw err('limit', msg);
+    if (r.status === 500 || r.status === 502 || r.status === 503 || r.status === 504) throw err('busy', msg);
     throw err('http', r.status + ' ' + msg);
   }
   async function gen(body, models, signal) {
+    /* try every model; if they are busy or limited, wait a little and go round once more */
     let last = null;
-    for (const m of models) {
-      try { return await post(m, body, signal); } catch (e) { last = e; if (e.kind !== 'model') throw e; }
+    for (let round = 0; round < 3; round++) {
+      let hard = null;
+      for (const m of models) {
+        try { return await post(m, body, signal); } catch (e) { last = e; if (e.kind === 'model' || e.kind === 'busy' || e.kind === 'limit') { if (e.kind !== 'model') hard = e; continue; } throw e; }
+      }
+      if (!hard) break; if (round < 2) await S.sleep(3500 * (round + 1));
     }
     throw last || err('model');
   }
@@ -163,6 +169,7 @@
     const k = e && e.kind;
     if (k === 'key') return S.tt('AI کی (key) درست نہیں یا اس کی اجازت نہیں', 'The AI key is not valid or not allowed');
     if (k === 'limit') return S.tt('AI کی مفت حد پوری ہو گئی، کچھ دیر بعد کوشش کریں', 'AI free limit reached, try again in a while');
+    if (k === 'busy') return S.tt('AI سرور پر ابھی بہت رش ہے (گوگل کی طرف سے)، ایک دو منٹ بعد دوبارہ دبائیں', 'The AI server is busy right now (Google side). Please press again in a minute or two');
     if (k === 'net') return S.tt('انٹرنیٹ نہیں مل رہا', 'No internet connection');
     if (k === 'model') return S.tt('AI ماڈل نہیں ملا، Settings میں کی دوبارہ جانچیں', 'AI model not found, re-check the key in Settings');
     if (k === 'parse') return S.tt('AI کا جواب سمجھ نہیں آیا', 'Could not understand the AI answer');
