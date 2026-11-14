@@ -100,7 +100,8 @@ jobs:
           mkdir -p /tmp/ota && cp www.zip /tmp/ota/ && cd /tmp/ota
           git init -q && git checkout -q -b ota
           git config user.name "SMAA CI" && git config user.email "ci@users.noreply.github.com"
-          git add www.zip && git commit -q -m "web bundle ${{ github.run_number }}"
+          echo "{\"n\":${{ github.run_number }},\"need\":1,\"apk\":\"https://github.com/${{ github.repository }}/releases/download/apk-${{ github.run_number }}/Cleanova-Studio.apk\",\"zip\":\"https://github.com/${{ github.repository }}/releases/download/apk-${{ github.run_number }}/www.zip\"}" > latest.json
+          git add www.zip latest.json && git commit -q -m "web bundle ${{ github.run_number }}"
           git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
           git push -q -f origin ota
           echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT

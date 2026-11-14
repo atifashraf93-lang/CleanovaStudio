@@ -27,20 +27,32 @@
     return l;
   }
 
-  function check() {
-    s('chk', Date.now());
+  /* 1) a small static file (no API rate limit), 2) the GitHub API as a fallback */
+  function viaFile() {
+    return fetch('https://raw.githubusercontent.com/' + REPO + '/ota/latest.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error('file ' + r.status); return r.json(); }).then(function (j) {
+      if (!j || !j.n || !j.apk) throw new Error('bad file'); return { n: +j.n, url: j.apk, zip: j.zip || null, need: +j.need || 1, sha: '' };
+    });
+  }
+  function viaApi() {
     return fetch('https://api.github.com/repos/' + REPO + '/releases?per_page=15').then(function (r) { return r.json(); }).then(function (rs) {
+      if (!Array.isArray(rs)) throw new Error((rs && rs.message) || 'api');
       var best = null;
-      (rs || []).forEach(function (x) {
+      rs.forEach(function (x) {
         var m = /^apk-(\d+)$/.exec(x.tag_name || ''); if (!m || !x.assets || (best && +m[1] <= best.n)) return;
         var apk = null, zip = null;
         x.assets.forEach(function (a) { if (/\.apk$/i.test(a.name)) apk = a.browser_download_url; else if (a.name === 'www.zip') zip = a.browser_download_url; });
         var nd = /need=(\d+)/.exec(x.body || ''), sh = /sha=([0-9a-f]{7,40})/.exec(x.body || '');
         if (apk) best = { n: +m[1], url: apk, zip: zip, need: nd ? +nd[1] : 1, sha: sh ? sh[1] : '' };
       });
-      if (best) s('rel', best);
-      return best;
-    }).catch(function () { return g('rel'); });
+      if (!best) throw new Error('no release'); return best;
+    });
+  }
+  var lastErr = '';
+  function check() {
+    s('chk', Date.now()); lastErr = '';
+    return viaFile().catch(function (e) { lastErr = String(e && e.message || e); return viaApi(); }).then(function (best) {
+      if (best) { s('rel', best); lastErr = ''; } return best;
+    }).catch(function (e) { lastErr = String(e && e.message || e); return g('rel'); });
   }
 
   /* ---------- card ---------- */
@@ -111,7 +123,9 @@
   var hid = 0;
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { hid = Date.now(); return; }
-    if (hid && Date.now() - hid > 20000) { if (!apply() && Date.now() - (g('chk') || 0) > 30 * 60000) look(); }
+    if (hid && Date.now() - hid > 20000) { if (!apply() && Date.now() - (g('chk') || 0) > 5 * 60000) look(); }
   });
-  setInterval(function () { if (!document.hidden && Date.now() - (g('chk') || 0) > 30 * 60000) look(); }, 5 * 60000);
+  setInterval(function () { if (!document.hidden && Date.now() - (g('chk') || 0) > 10 * 60000) look(); }, 2 * 60000);
+  /* manual check, used by Settings */
+  window.SMAAUpd = { build: BUILD, check: function () { hidden = false; return check().then(function (u) { card(); if (u && u.n > BUILD && u.zip && (u.need || 1) <= API && !g('otaready')) start(u); return { build: BUILD, latest: u ? u.n : 0, err: lastErr }; }); } };
 })();
