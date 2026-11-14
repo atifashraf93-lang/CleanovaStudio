@@ -20,12 +20,14 @@
     root().innerHTML = '<div class="scr">' + top('Cleanova Studio<small>Developed by SMAA</small>', false, langBox() + '<button class="ib" id="gear" aria-label="Settings">⚙️</button>') + '<div class="body">' +
       '<button class="big" id="nw"><span class="ico">🎬</span><div><b>' + tt('نئی ویڈیو، خود بخود ایڈٹ', 'New video, edited for you') + '</b><span>' + tt('فوٹو اور ویڈیو چنیں، باقی کام ایپ کرے گی', 'Pick photos and videos, the app does the rest') + '</span></div></button>' +
       '<button class="big alt" id="ns"><span class="ico">✍️</span><div><b>' + tt('اسکرپٹ سے ویڈیو', 'Video from a script') + '</b><span>' + tt('اپنی لکھی لائنیں دیں، ہر لائن ایک سین بنے گی', 'Give your lines, each line becomes a scene') + '</span></div></button>' +
+      '<button class="big alt2" id="np"><span class="ico">📣</span><div><b>' + tt('پروموشن · ایونٹ · سوشل · آگاہی', 'Promo · Event · Social · Awareness') + '</b><span>' + tt('تیار ٹیمپلیٹس: شادی، ورکشاپ، سیل، خبر، اپیل اور بہت کچھ', 'Ready templates: wedding, workshop, sale, news, appeal and more') + '</span></div></button>' +
       '<div class="row" style="margin-top:12px"><button class="mini" id="pj"><span class="ico">📁</span><span>' + tt('میرے پروجیکٹ', 'My projects') + '</span></button><button class="mini" id="mv"><span class="ico">🎞️</span><span>' + tt('میری ویڈیوز', 'My videos') + (nv ? ' (' + nv + ')' : '') + '</span></button></div>' +
       '<div class="card"><h3>' + (aiOn ? '🤖 ' + tt('AI موڈ چالو ہے', 'AI mode is on') : '🤖 ' + tt('AI موڈ بند ہے', 'AI mode is off')) + '</h3><div class="mut">' + (aiOn ? tt('AI کلپس دیکھ کر اسکرپٹ کی ہر لائن صحیح کلپ پر لگائے گی۔', 'AI will look at your clips and put each script line on the right clip.') : tt('بغیر AI بھی سب چلتا ہے۔ AI کے لیے Settings میں اپنی مفت key ڈالیں۔', 'Everything works without AI. For AI, add your own free key in Settings.')) + '</div></div>' +
       '<div class="credit">Developed by SMAA</div></div></div>';
     bindLang(); $('#gear').onclick = () => app.go('settings');
     $('#nw').onclick = () => { resetWiz(); app.go('wizard'); S.stat('wizard'); };
     $('#ns').onclick = () => { resetWiz(); W.focusScript = true; app.go('wizard'); S.stat('wizard'); };
+    $('#np').onclick = () => { app.go('tpls'); S.stat('tpls'); };
     $('#pj').onclick = () => app.go('projects'); $('#mv').onclick = () => app.go('videos');
   };
 
@@ -80,6 +82,85 @@
     });
     $$('[data-rm]').forEach(b => b.onclick = async () => { if (await S.confirm(tt('حذف کریں؟', 'Delete?'), tt('یہ پروجیکٹ ہمیشہ کے لیے ہٹ جائے گا۔', 'This project will be removed for good.'))) { const rec = await S.db.get('proj', b.dataset.rm); for (const k of (rec && rec.blobKeys) || []) await S.db.del('media', b.dataset.rm + ':' + k); await S.db.del('proj', b.dataset.rm); app.go('projects'); } });
   };
+
+  /* ============ TEMPLATES ============ */
+  const TP = S.tpl, CD = S.cards; let TC = 'social', TF = null;
+  SCR.tpls = function () {
+    const cats = TP.CATS.map(c => [c[0], c[2] + ' ' + c[1][S.lang === 'ur' ? 0 : 1]]);
+    const list = TP.LIST.filter(t => t.cat === TC);
+    root().innerHTML = '<div class="scr">' + top(tt('تیار ٹیمپلیٹس', 'Ready templates'), true, langBox()) + '<div class="body">' + chips(cats, TC, 'cat') +
+      '<div class="tpls">' + list.map(t => { const th = CD.THEMES[t.theme]; return '<button class="tpl" data-t="' + t.id + '" style="background:linear-gradient(135deg,' + th.c2 + ',' + th.a1 + '88)"><i>' + t.e + '</i><span>' + TP.name(t) + '</span></button>'; }).join('') + '</div>' +
+      '<div class="mut" style="margin-top:12px">' + tt('ہر ٹیمپلیٹ میں آپ سب متن، رنگ، لوگو اور تصاویر بدل سکتے ہیں۔ اعداد و شمار آپ خود دیتے ہیں، ایپ انہیں چیک نہیں کرتی۔', 'Every template lets you change all text, colours, logo and pictures. You supply the facts and numbers; the app does not verify them.') + '</div></div></div>';
+    bindLang(); $('#bk').onclick = () => app.go('home');
+    $$('[data-cat]').forEach(b => b.onclick = () => { TC = b.dataset.cat; SCR.tpls(); });
+    $$('[data-t]').forEach(b => b.onclick = () => { newTF(TP.get(b.dataset.t)); app.go('tplform'); });
+  };
+  function newTF(t) {
+    const br = TP.brand(), sv = S.get('wiz', {});
+    TF = { t, vals: { org: br.name || '', date_iso: '' }, media: [], loading: 0, fmt: sv.fmt || '9:16', res: S.get('res', 720), music: 'auto', musicFile: null, voice: 'none', gvoice: 'Kore', brandOn: true, credit: S.get('credit', true) !== false };
+  }
+  async function addTplMedia(files) {
+    files = Array.from(files || []); if (!files.length) return; TF.loading += files.length; paintTM();
+    for (const f of files) { try { const c = await A.loadFile(f, false); c.adj = A.adjFor(c); TF.media.push(c); } catch (e) { S.toast('فائل نہیں کھلی', 'Could not open a file'); } TF.loading--; paintTM(); }
+  }
+  function paintTM() {
+    const box = $('#tm'); if (!box) return;
+    box.innerHTML = '<div class="grid">' + TF.media.map(c => '<div class="tile"><canvas data-th="' + c.id + '"></canvas><button class="x" data-x="' + c.id + '">✕</button><span class="k">' + (c.kind === 'v' ? '🎥' : '📷') + '</span></div>').join('') + '<button class="tile add" id="tadd">' + (TF.loading ? '<span class="spin"></span>' : '＋') + '</button></div>';
+    TF.media.forEach(c => { const cv = box.querySelector('[data-th="' + c.id + '"]'); if (cv && c.thumb) { cv.width = c.thumb.width; cv.height = c.thumb.height; cv.getContext('2d').drawImage(c.thumb, 0, 0); } });
+    $$('[data-x]', box).forEach(b => b.onclick = () => { TF.media = TF.media.filter(c => c.id !== b.dataset.x); paintTM(); });
+    $('#tadd').onclick = () => $('#tfm').click();
+  }
+  SCR.tplform = async function () {
+    if (!TF) { SCR.tpls(); return; }
+    const t = TF.t, aiOn = AI.enabled(), br = TP.brand(); const info = TF.voice === 'phone' ? await AI.phoneInfo() : null;
+    const moodItems = [['auto', tt('خود', 'Auto')]].concat(S.music.list.map(m => [m, S.music.MOODS[m].n[S.lang === 'ur' ? 0 : 1]])).concat([['file', TF.musicFile ? '🎵 ' + TF.musicFile.name.slice(0, 14) : tt('میرا گانا', 'My own song')], ['none', tt('بغیر موسیقی', 'No music')]]);
+    const pk = v => (Array.isArray(v) ? v[S.lang === 'ur' ? 0 : 1] : v);
+    const fields = t.ask.map(k => { const a = TP.ASK[k], lab = pk(a[0]), ph = k === 'date' ? '' : (t.def[k] ? pk(t.def[k]) : pk(a[1])), v = TF.vals[k] || '';
+      if (k === 'date') return '<div class="lbl">' + lab + '</div><input class="inp" type="date" id="v_date" value="' + esc(TF.vals.date_iso || '') + '"><div class="mut">' + tt('خالی چھوڑیں تو ٹیمپلیٹ کی مثال تاریخ رہے گی', 'Leave empty to keep the sample date') + '</div>';
+      return '<div class="lbl">' + lab + '</div>' + (k === 'points' ? '<textarea id="v_' + k + '" rows="4" placeholder="' + esc(ph) + '">' + esc(v) + '</textarea>' : '<input class="inp" type="text" id="v_' + k + '" value="' + esc(v) + '" placeholder="' + esc(ph) + '">'); }).join('');
+    root().innerHTML = '<div class="scr">' + top(t.e + ' ' + TP.name(t), true) + '<div class="body">' +
+      '<div class="card"><h3>1️⃣ ' + tt('تفصیلات', 'Details') + '</h3><div class="mut">' + tt('جو خالی چھوڑیں گے اس کی جگہ مثال کا متن آئے گا، بعد میں ایڈیٹر میں بدل سکتے ہیں۔', 'Empty fields keep the sample text. You can change everything later in the editor.') + '</div>' + fields + '</div>' +
+      '<div class="card"><h3>2️⃣ ' + tt('لوگو اور برانڈ', 'Logo and brand') + '</h3><label class="sw"><span>' + tt('برانڈ پٹی لگائیں', 'Add the brand bar') + '</span><input type="checkbox" id="tbr"' + (TF.brandOn ? ' checked' : '') + '></label><div class="acts"><button id="tlg">🖼️ ' + (br.logo ? tt('محفوظ لوگو موجود ہے', 'Saved logo in use') : tt('لوگو چنیں', 'Pick logo')) + '</button></div><div class="mut">' + tt('لوگو اور نام ایک بار محفوظ ہو جاتا ہے، آئندہ خود آ جائے گا۔', 'Your logo and name are saved once and reused next time.') + '</div></div>' +
+      '<div class="card"><h3>3️⃣ ' + tt('اپنی تصاویر / ویڈیو (اختیاری)', 'Your photos / videos (optional)') + '</h3><div class="mut">' + tt('یہ نیون فریم والے ہائی لائٹ سین بنیں گے۔', 'They become highlighted scenes inside the neon frame.') + '</div><div id="tm"></div><input type="file" id="tfm" accept="image/*,video/*" multiple hidden></div>' +
+      '<div class="card"><h3>4️⃣ ' + tt('موسیقی اور آواز', 'Music and voice') + '</h3><div class="lbl">' + tt('موسیقی', 'Music') + '</div>' + chips(moodItems, TF.music, 'mus') + '<input type="file" id="tmf" accept="audio/*" hidden>' +
+      '<div class="lbl">' + tt('وائس اوور', 'Voice-over') + '</div>' + chips([['none', tt('نہیں', 'None')], ['phone', tt('فون کی آواز', 'Phone voice')], ['gemini', tt('AI آواز', 'AI voice')]], TF.voice, 'voi') +
+      (TF.voice === 'gemini' ? chips(AI.VOICES, TF.gvoice, 'gv') + (aiOn ? '' : '<div class="mut">⚠️ ' + tt('Settings میں key ڈالیں', 'Add the AI key in Settings') + '</div>') : '') +
+      (TF.voice === 'phone' ? '<div class="mut">' + (!S.native() ? '⚠️ ' + tt('فون کی آواز صرف ایپ کے اندر', 'Phone voice only works inside the app') : info && info.ok ? tt('اردو آواز: ', 'Urdu voice: ') + (info.ur ? '✅' : '❌') : '⚠️ ' + tt('فون میں text-to-speech نہیں', 'No text-to-speech on this phone')) + '</div>' : '') + '</div>' +
+      '<div class="card"><h3>5️⃣ ' + tt('فارمیٹ', 'Format') + '</h3>' + chips(FMT(), TF.fmt, 'fmt') + chips([[720, '720p'], [1080, '1080p']], TF.res, 'res') + '</div>' +
+      '<button class="pri big2" id="tgo">🎬 ' + tt('ویڈیو بنائیں', 'Make the video') + '</button><div class="credit">Developed by SMAA</div></div></div>';
+    $('#bk').onclick = () => app.go('tpls'); paintTM();
+    t.ask.forEach(k => { const el = $('#v_' + k); if (!el) return; el.oninput = () => { if (k === 'date') TF.vals.date_iso = el.value; else TF.vals[k] = el.value; }; });
+    $('#tbr').onchange = e => { TF.brandOn = e.target.checked; };
+    $('#tlg').onclick = () => { const fi = document.createElement('input'); fi.type = 'file'; fi.accept = 'image/*'; fi.onchange = async () => { if (!fi.files[0]) return; try { const b = TP.brand(); b.logo = await TP.logoFromFile(fi.files[0]); if (TF.vals.org) b.name = TF.vals.org; TP.saveBrand(b); S.toast('لوگو محفوظ ہو گیا', 'Logo saved'); SCR.tplform(); } catch (e) { S.toast('لوگو نہیں کھلا', 'Could not open the logo'); } }; fi.click(); };
+    $('#tfm').onchange = e => { addTplMedia(e.target.files); e.target.value = ''; };
+    $('#tmf').onchange = e => { const f = e.target.files[0]; if (f) { TF.musicFile = f; TF.music = 'file'; SCR.tplform(); } };
+    $$('[data-mus]').forEach(b => b.onclick = () => { if (b.dataset.mus === 'file') { $('#tmf').click(); return; } TF.music = b.dataset.mus; SCR.tplform(); });
+    $$('[data-voi]').forEach(b => b.onclick = () => { TF.voice = b.dataset.voi; SCR.tplform(); }); $$('[data-gv]').forEach(b => b.onclick = () => { TF.gvoice = b.dataset.gv; SCR.tplform(); });
+    $$('[data-fmt]').forEach(b => b.onclick = () => { TF.fmt = b.dataset.fmt; SCR.tplform(); }); $$('[data-res]').forEach(b => b.onclick = () => { TF.res = +b.dataset.res; SCR.tplform(); });
+    $('#tgo').onclick = makeFromTpl;
+  };
+  async function makeFromTpl() {
+    if (TF.loading) { S.toast('تصاویر ابھی لوڈ ہو رہی ہیں', 'Media is still loading'); return; }
+    const ac = new AbortController(); S.stat('tpl_' + TF.t.id);
+    const dlg = document.createElement('div'); dlg.className = 'dlg'; dlg.innerHTML = '<div class="dbox"><h3>🎬 ' + tt('ویڈیو بن رہی ہے', 'Building the video') + '</h3><div class="dbody" id="pm">…</div><div class="bar"><i id="pb"></i></div><div class="dbtn"><button id="pc" class="sec">' + tt('منسوخ', 'Cancel') + '</button></div></div>'; document.body.appendChild(dlg);
+    const msg = (m, q) => { const e = $('#pm'); if (e) e.textContent = m; if (q !== undefined && $('#pb')) $('#pb').style.width = Math.round(q * 100) + '%'; };
+    $('#pc').onclick = () => { ac.abort(); dlg.remove(); };
+    try {
+      if (TF.vals.org && TF.vals.org.trim()) { const b = TP.brand(); if (!b.name) { b.name = TF.vals.org.trim(); TP.saveBrand(b); } }
+      msg(tt('سین بنا رہا ہوں…', 'Designing scenes…'), .2); await S.sleep(30);
+      const p = TP.build(TF.t, TF.vals, { fmt: TF.fmt, res: TF.res, music: TF.music, musicFile: TF.musicFile, media: TF.media.slice(), credit: TF.credit, brandOn: TF.brandOn });
+      p.clips.forEach(c => { if (c.kind === 'c') c.thumb = CD.thumb(c, p, { logo: p.brand.logo }); });
+      let note = '';
+      if (TF.voice !== 'none') {
+        msg(tt('آواز بنا رہا ہوں…', 'Making the voice-over…'), .4);
+        try { await TP.makeVoices(p, TF.voice, { voice: TF.gvoice }, (i, n) => msg(tt('آواز بن رہی ہے ', 'Voice ') + i + '/' + n, .4 + .45 * i / Math.max(1, n)), ac.signal); }
+        catch (e) { if (ac.signal.aborted) return; p.voice = []; note += AI.errText(e) + ' · ' + tt('بغیر آواز', 'no voice') + '. '; }
+      }
+      if (p.music.kind === 'synth') { msg(tt('موسیقی بنا رہا ہوں…', 'Composing the music…'), .92); try { await S.music.get(p.music.mood, 1); } catch (e) { p.music.kind = 'none'; } }
+      if (ac.signal.aborted) return; dlg.remove(); P.layout(p);
+      app.go('editor', { p, fresh: true, note });
+    } catch (e) { dlg.remove(); if (!ac.signal.aborted) S.toast('خرابی: ' + (e.message || e), 'Error: ' + (e.message || e), 5000); }
+  }
 
   /* ============ WIZARD ============ */
   let W = null;

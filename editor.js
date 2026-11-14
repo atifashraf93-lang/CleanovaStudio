@@ -9,7 +9,7 @@
   const COLORS = ['#ffffff', '#ffd36b', '#ff9ec2', '#5ad1ff', '#7cf29a', '#ff5a5a', '#c58bff', '#000000'];
   const STROKES = ['', '#000000', '#ffffff', '#ff3d7f', '#5a1a00'];
   const BGS = ['', 'rgba(0,0,0,.45)', 'rgba(255,255,255,.78)', 'rgba(255,211,107,.88)', 'rgba(139,124,255,.82)'];
-  const TABS = [['clips', '🎞️', ['کلپس', 'Clips']], ['text', '🔤', ['ٹیکسٹ', 'Text']], ['stk', '😊', ['اسٹکر', 'Stickers']], ['fx', '✨', ['ایفیکٹ', 'Effects']], ['mus', '🎵', ['موسیقی', 'Music']], ['voi', '🎙️', ['آواز', 'Voice']], ['fmt', '📐', ['فارمیٹ', 'Format']]];
+  const TABS = [['clips', '🎞️', ['کلپس', 'Clips']], ['text', '🔤', ['ٹیکسٹ', 'Text']], ['stk', '😊', ['اسٹکر', 'Stickers']], ['fx', '✨', ['ایفیکٹ', 'Effects']], ['mus', '🎵', ['موسیقی', 'Music']], ['voi', '🎙️', ['آواز', 'Voice']], ['scn', '🎬', ['سین / برانڈ', 'Scenes']], ['fmt', '📐', ['فارمیٹ', 'Format']]];
   const curClip = () => p.clips.find(c => c.id === sel.clip) || null;
   const curText = () => p.texts.find(t => t.id === sel.text) || null;
   const curSt = () => p.stickers.find(t => t.id === sel.st) || null;
@@ -104,13 +104,14 @@
   const spot = c => E.seek(c.t0 + c.d + .1);
 
   /* ---------- panels ---------- */
-  function paintPanel() { const pn = $('#pn'); if (!pn) return; const top = pn.scrollTop; ({ clips: pnClips, text: pnText, stk: pnStk, fx: pnFx, mus: pnMus, voi: pnVoi, fmt: pnFmt })[tab](pn); pn.scrollTop = top; }
+  function paintPanel() { const pn = $('#pn'); if (!pn) return; const top = pn.scrollTop; ({ clips: pnClips, text: pnText, stk: pnStk, fx: pnFx, mus: pnMus, voi: pnVoi, scn: pnScn, fmt: pnFmt })[tab](pn); pn.scrollTop = top; }
 
   /* ---- clips ---- */
   function pnClips(pn) {
     const c = curClip(), i = p.clips.indexOf(c);
     let h = '<div class="acts"><button id="mvl">' + (S.lang === 'ur' ? '▶' : '◀') + '</button><button id="mvr">' + (S.lang === 'ur' ? '◀' : '▶') + '</button><button id="dup">⧉ ' + tt('نقل', 'Duplicate') + '</button><button id="del">🗑 ' + tt('ہٹائیں', 'Delete') + '</button><button id="add">＋ ' + tt('شامل کریں', 'Add media') + '</button></div>';
     if (!c) { pn.innerHTML = h + '<div class="empty">' + tt('کوئی کلپ نہیں', 'No clips') + '</div>'; bindActs(); return; }
+    if (c.kind === 'c') { pnCard(pn, c, i); return; }
     if (c.kind === 'i') h += slider('len', tt('دورانیہ', 'Duration'), 1, 12, .1, c.len - (p.clips[i + 1] ? p.clips[i + 1].d : 0), S.dur);
     else {
       h += slider('tin', tt('شروع', 'Start'), 0, Math.max(.4, c.dur - .3), .1, c.in, S.dur) + slider('tout', tt('آخر', 'End'), .3, c.dur, .1, c.out, S.dur);
@@ -122,7 +123,8 @@
     h += '<h4>' + tt('اندر آنے کی حرکت', 'Animation in') + '</h4>' + chips(nameList(FX.IN_NAMES), c.anim.in, 'ai') + '<h4>' + tt('بیچ میں حرکت', 'Motion during clip') + '</h4>' + chips(nameList(FX.MID_NAMES), c.anim.mid, 'am') + '<h4>' + tt('باہر جانے کی حرکت', 'Animation out') + '</h4>' + chips(nameList(FX.OUT_NAMES), c.anim.out, 'ao');
     h += '<h4>' + tt('ویڈیو ایفیکٹ', 'Video effect') + '</h4>' + chips(nameList(Object.assign({}, FX.VFX_NAMES, { shake: ['ہلنا', 'Shake'] })), c.vfx, 'vf');
     if (i > 0) h += '<h4 id="trs">' + tt('پچھلے کلپ سے ٹرانزیشن', 'Transition from previous clip') + '</h4>' + chips(nameList(FX.TR_NAMES, FX.TR_LIST), c.trans.type, 'tr') + slider('trd', tt('ٹرانزیشن کا دورانیہ', 'Transition length'), .2, 1.5, .1, c.trans.dur || .6, S.dur) + '<div class="acts"><button id="tra">' + tt('سب کلپس پر لگائیں', 'Apply to all clips') + '</button></div>';
-    pn.innerHTML = h; bindActs();
+    h += pnHL(c);
+    pn.innerHTML = h; bindActs(); bindHL(pn, c);
     const bc = (attr, fn) => $$('[data-' + attr + ']', pn).forEach(b => b.onclick = () => { fn(b.dataset[attr]); commit(); paintPanel(); const cc = curClip(); if (cc && (attr === 'tr' || attr === 'ai' || attr === 'vf' || attr === 'am')) { spot(cc); if (attr === 'tr') E.seek(cc.t0 + cc.d * .5); } });
     bc('sp', v => { c.speed = +v; }); bc('fit', v => { c.fit = v || null; }); bc('ai', v => { c.anim.in = v; }); bc('am', v => { c.anim.mid = v; }); bc('ao', v => { c.anim.out = v; }); bc('vf', v => { c.vfx = v; }); bc('tr', v => { c.trans.type = v; if (v === 'none') c.trans.dur = 0; else if (!c.trans.dur) c.trans.dur = .6; });
     if ($('#len')) bindSlider('len', v => { c.len = v + (p.clips[i + 1] ? p.clips[i + 1].d : 0); }, S.dur);
@@ -137,7 +139,7 @@
     $('#add').onclick = addMediaPick;
     $('#mvl').onclick = () => { if (i > 0) { p.clips.splice(i - 1, 0, p.clips.splice(i, 1)[0]); fixFirst(); commit(); paintTL(); paintPanel(); spot(c); } };
     $('#mvr').onclick = () => { if (i >= 0 && i < p.clips.length - 1) { p.clips.splice(i + 1, 0, p.clips.splice(i, 1)[0]); fixFirst(); commit(); paintTL(); paintPanel(); spot(c); } };
-    $('#dup').onclick = () => { if (!c) return; const d = JSON.parse(JSON.stringify(c, (k, v) => (['file', 'url', 'el', 'bmp', 'thumb', 'frames', 'node', 'gain', 'an'].indexOf(k) >= 0 ? undefined : v))); Object.assign(d, { id: S.uid(), file: c.file, url: c.url, thumb: c.thumb, an: c.an }); REG[d.id] = d; p.clips.splice(i + 1, 0, d); sel.clip = d.id; fixFirst(); commit(); paintTL(); paintPanel(); spot(d); };
+    $('#dup').onclick = () => { if (!c) return; const d = JSON.parse(JSON.stringify(c, (k, v) => (['file', 'url', 'el', 'bmp', 'thumb', 'frames', 'node', 'gain', 'an', 'cfiles', 'cbmp'].indexOf(k) >= 0 ? undefined : v))); Object.assign(d, { id: S.uid(), file: c.file, url: c.url, thumb: c.thumb, an: c.an, cfiles: c.cfiles ? c.cfiles.slice() : undefined }); REG[d.id] = d; p.clips.splice(i + 1, 0, d); sel.clip = d.id; fixFirst(); commit(); paintTL(); paintPanel(); spot(d); };
     $('#del').onclick = () => { if (!c) return; if (p.clips.length <= 1) { S.toast('آخری کلپ نہیں ہٹ سکتا', 'Cannot delete the last clip'); return; } E.relClip(c); p.clips.splice(i, 1); p.texts = p.texts.filter(t => t.clip !== c.id); p.stickers = p.stickers.filter(t => t.clip !== c.id); p.voice = p.voice.filter(v => v.clip !== c.id); sel.clip = (p.clips[Math.min(i, p.clips.length - 1)] || {}).id; fixFirst(); commit(); paintTL(); paintPanel(); };
   }
   function fixFirst() { p.clips.forEach((c, k) => { if (k === 0) c.trans = { type: 'none', dur: 0 }; else if (!c.trans || c.trans.type === 'none' && !c.trans.dur) c.trans = { type: 'fade', dur: .6 }; }); E.layoutAll(); }
@@ -317,11 +319,88 @@
   function pnFmt(pn) {
     pn.innerHTML = '<h4>' + tt('شکل', 'Shape') + '</h4>' + chips([['9:16', '9:16 ' + tt('ریل', 'Reel')], ['16:9', '16:9 ' + tt('یوٹیوب', 'YouTube')], ['1:1', '1:1'], ['4:5', '4:5']], p.fmt, 'ft') +
       '<h4>' + tt('ایکسپورٹ کوالٹی', 'Export quality') + '</h4>' + chips([[720, '720p'], [1080, '1080p']], p.res, 'rs') + sw('cr', tt('آخر میں "Developed by SMAA"', 'Show "Developed by SMAA" at the end'), p.credit) +
-      '<div class="acts" style="margin-top:12px"><button id="rw">🔁 ' + tt('نئے انداز سے دوبارہ آٹو ایڈٹ', 'Re-run auto edit with another style') + '</button></div><div class="mut">' + tt('یہ آپ کی موجودہ ایڈیٹنگ کی جگہ نئی بنائے گا۔', 'This replaces your current edits with a fresh one.') + '</div>';
+      (p.kind === 'promo' ? '<div class="acts" style="margin-top:12px"><button id="rw">🎬 ' + tt('ٹیمپلیٹس پر واپس', 'Back to templates') + '</button></div>' : '<div class="acts" style="margin-top:12px"><button id="rw">🔁 ' + tt('نئے انداز سے دوبارہ آٹو ایڈٹ', 'Re-run auto edit with another style') + '</button></div><div class="mut">' + tt('یہ آپ کی موجودہ ایڈیٹنگ کی جگہ نئی بنائے گا۔', 'This replaces your current edits with a fresh one.') + '</div>');
     $$('[data-ft]', pn).forEach(b => b.onclick = () => { p.fmt = b.dataset.ft; E.size(); commit(); paintPanel(); });
     $$('[data-rs]', pn).forEach(b => b.onclick = () => { p.res = +b.dataset.rs; commit(); paintPanel(); });
     $('#cr').onchange = e => { p.credit = e.target.checked; commit(); };
-    $('#rw').onclick = async () => { if (await S.confirm(tt('دوبارہ ایڈٹ؟', 'Re-edit?'), tt('موجودہ تبدیلیاں ختم ہو جائیں گی۔', 'Your current changes will be replaced.'))) { E.destroy(); E = null; p = null; app.go('wizard'); } };
+    $('#rw').onclick = async () => { if (await S.confirm(tt('دوبارہ ایڈٹ؟', 'Re-edit?'), tt('موجودہ تبدیلیاں ختم ہو جائیں گی۔', 'Your current changes will be replaced.'))) { const promo = p.kind === 'promo'; E.destroy(); E = null; p = null; app.go(promo ? 'tpls' : 'wizard'); } };
+  }
+
+  /* ---- designed scenes (cards), highlight frame, brand, ticker, lower thirds ---- */
+  const CD = S.cards, TP = S.tpl;
+  const fld = (id, label, val, area) => '<div class="lbl">' + label + '</div>' + (area ? '<textarea dir="auto" id="' + id + '" rows="3">' + esc(val || '') + '</textarea>' : '<input class="inp" dir="auto" type="text" id="' + id + '" value="' + esc(val || '') + '">');
+  const lbl = k => (CD.LBL[k] ? CD.LBL[k][S.lang === 'ur' ? 0 : 1] : k);
+  let thT = 0;
+  function rethumb(c) { clearTimeout(thT); thT = setTimeout(() => { try { c.thumb = CD.thumb(c, p, { imgs: c.cbmp || [], logo: p.brand && p.brand.logo }); paintTL(); } catch (e) { /* ignore */ } }, 250); }
+  function pickImage(cb) { const fi = document.createElement('input'); fi.type = 'file'; fi.accept = 'image/*'; fi.onchange = () => { if (fi.files[0]) cb(fi.files[0]); }; fi.click(); }
+  function pnCard(pn, c, i) {
+    const d = c.card.data, T = CD.TYPES[c.card.type], fs = CD.fields(c.card.type);
+    let h = '<div class="acts"><button id="mvl">' + (S.lang === 'ur' ? '▶' : '◀') + '</button><button id="mvr">' + (S.lang === 'ur' ? '◀' : '▶') + '</button><button id="dup">⧉ ' + tt('نقل', 'Duplicate') + '</button><button id="del">🗑 ' + tt('ہٹائیں', 'Delete') + '</button><button id="add">＋ ' + tt('میڈیا', 'Add media') + '</button></div>';
+    h += '<h4>' + T.e + ' ' + nm(T, 'n').toString().replace(/,.*/, '') + '</h4>';
+    h += slider('len', tt('دورانیہ', 'Duration'), 2, 14, .1, c.len - (p.clips[i + 1] ? p.clips[i + 1].d : 0), S.dur);
+    fs.forEach(f => {
+      if (f.kind === 'i') h += '<div class="lbl">' + lbl(f.k) + '</div><div class="acts"><button data-img="' + f.k.slice(3) + '">🖼️ ' + (c.cfiles && c.cfiles[+f.k.slice(3)] ? tt('تبدیل کریں', 'Change') : tt('تصویر چنیں', 'Pick image')) + '</button></div>';
+      else if (f.kind === 'd') h += '<div class="lbl">' + lbl(f.k) + '</div><input class="inp" type="date" id="f_' + f.k + '" value="' + esc(d[f.k] || '') + '">';
+      else h += fld('f_' + f.k, lbl(f.k), d[f.k], f.kind === 'a');
+    });
+    h += fld('f_say', lbl('say'), d.say, true);
+    if (i > 0) h += '<h4 id="trs">' + tt('پچھلے سین سے ٹرانزیشن', 'Transition from previous') + '</h4>' + chips(nameList(FX.TR_NAMES, FX.TR_LIST), c.trans.type, 'tr') + slider('trd', tt('ٹرانزیشن کا دورانیہ', 'Transition length'), .2, 1.5, .1, c.trans.dur || .5, S.dur);
+    pn.innerHTML = h; bindActs();
+    if (!E.playing) { const ts = c.t0 + c.d + Math.min(c.len * .8, 4.2); E.seek(ts); }
+    fs.forEach(f => { const el = $('#f_' + f.k); if (!el) return; el.oninput = () => { d[f.k] = el.value; rethumb(c); E.invalidate(); }; el.onchange = () => { commit(); }; });
+    $('#f_say').oninput = e => { d.say = e.target.value; }; $('#f_say').onchange = () => commit();
+    $$('[data-img]', pn).forEach(b => b.onclick = () => pickImage(f => { const k = +b.dataset.img; c.cfiles[k] = f; if (!c.cbmp) c.cbmp = [null, null]; c.cbmp[k] = null; c['_cl' + k] = false; E.loadCard(c); setTimeout(() => { rethumb(c); E.invalidate(); }, 500); commit(); paintPanel(); }));
+    bindSlider('len', v => { c.len = v + (p.clips[i + 1] ? p.clips[i + 1].d : 0); }, S.dur);
+    $$('[data-tr]', pn).forEach(b => b.onclick = () => { c.trans.type = b.dataset.tr; if (b.dataset.tr === 'none') c.trans.dur = 0; else if (!c.trans.dur) c.trans.dur = .5; commit(); paintPanel(); E.seek(c.t0 + c.d * .5); });
+    if ($('#trd')) bindSlider('trd', v => { c.trans.dur = v; }, S.dur);
+  }
+  function pnHL(c) {
+    const hl = c.hl || (c.hl = { on: false, chip: '', title: '', num: 0, sub: '', chips: '' });
+    let h = '<h4>🖼️ ' + tt('ہائی لائٹ فریم (نیون)', 'Highlight frame (neon)') + '</h4>' + sw('hlon', tt('اس کلپ کو ڈیزائن فریم میں دکھائیں', 'Show this clip inside a designed frame'), hl.on);
+    if (hl.on) h += fld('hlchip', tt('اوپر کا چپ لیبل', 'Chip label (top)'), hl.chip) + fld('hltitle', tt('عنوان', 'Title'), hl.title) + fld('hlnum', tt('نمبر (0 = بغیر)', 'Number (0 = none)'), hl.num) + fld('hlsub', tt('نیچے کی لائن', 'Bottom line'), hl.sub) + fld('hlchips', tt('اعداد: بڑا | چھوٹا (ہر لائن)', 'Stat chips: big | small (per row)'), hl.chips, true) + sw('hlstr', tt('نیچے تھمب نیل پٹی', 'Thumbnail strip'), p.strip !== false);
+    return h;
+  }
+  function bindHL(pn, c) {
+    const hl = c.hl; if (!$('#hlon')) return; $('#hlon').onchange = e => { hl.on = e.target.checked; commit(); paintPanel(); if (hl.on) E.seek(c.t0 + c.d + Math.min(c.len * .6, 1.5)); };
+    if (!hl.on) return; [['hlchip', 'chip'], ['hltitle', 'title'], ['hlnum', 'num'], ['hlsub', 'sub'], ['hlchips', 'chips']].forEach(([id, k]) => { const el = $('#' + id); el.oninput = () => { hl[k] = el.value; E.invalidate(); }; el.onchange = () => commit(); });
+    $('#hlstr').onchange = e => { p.strip = e.target.checked; commit(); };
+  }
+  let sVoice = 'phone', sGv = 'Kore';
+  function pnScn(pn) {
+    const b = p.brand || (p.brand = { on: false, name: '', header: '', footer: '', logo: '' }), tk = p.ticker || { on: false, label: '', text: '' };
+    let h = '<h4>🎬 ' + tt('نیا ڈیزائن سین جوڑیں', 'Add a designed scene') + '</h4><div class="tgrid">' + CD.TYPE_LIST.map(k => '<button data-ns="' + k + '"><i>' + CD.TYPES[k].e + '</i><span>' + CD.TYPES[k].n[S.lang === 'ur' ? 0 : 1] + '</span></button>').join('') + '</div>';
+    h += '<h4>🎨 ' + tt('رنگوں کا تھیم', 'Colour theme') + '</h4>' + chips(CD.THEME_LIST.map(k => [k, CD.THEMES[k].n[S.lang === 'ur' ? 0 : 1]]), p.theme || 'neon', 'th');
+    h += '<h4>🏷️ ' + tt('برانڈ کٹ (لوگو اور نام)', 'Brand kit (logo and name)') + '</h4>' + sw('bron', tt('ہر سین پر برانڈ پٹی دکھائیں', 'Show the brand bar on every scene'), b.on);
+    h += fld('brname', tt('ادارے / نام', 'Organisation / name'), b.name) + fld('brhead', tt('اوپر کا ربن متن', 'Top ribbon text'), b.header) + fld('brfoot', tt('نیچے کی پٹی کا متن', 'Footer strip text'), b.footer);
+    h += '<div class="acts"><button id="brlogo">🖼️ ' + (b.logo ? tt('لوگو تبدیل کریں', 'Change logo') : tt('لوگو چنیں', 'Pick logo')) + '</button>' + (b.logo ? '<button id="brrm">✕ ' + tt('لوگو ہٹائیں', 'Remove logo') + '</button>' : '') + '<button id="brsave">💾 ' + tt('برانڈ کٹ محفوظ کریں', 'Save as my brand kit') + '</button></div>';
+    h += '<h4>📰 ' + tt('چلتی خبر کی پٹی', 'News ticker') + '</h4>' + sw('tkon', tt('پٹی دکھائیں', 'Show ticker'), tk.on) + (tk.on ? fld('tklab', tt('لیبل', 'Label'), tk.label) + fld('tktxt', tt('متن', 'Text'), tk.text) : '');
+    h += '<h4>🎙️ ' + tt('نام پٹی (Lower third)', 'Name tags (lower third)') + '</h4>' + (p.lowers || []).map((lw, k) => '<div class="card2">' + fld('lwn' + k, tt('نام', 'Name'), lw.name) + fld('lwr' + k, tt('عہدہ', 'Role'), lw.role) + chips([[.8, tt('نیچے', 'Low')], [.65, tt('درمیان', 'Mid')], [.22, tt('اوپر', 'Top')]], lw.y || .8, 'lwy' + k) + chips([['clip', tt('موجودہ کلپ پر', 'On selected clip')], ['all', tt('پوری ویڈیو', 'Whole video')]], lw.all ? 'all' : 'clip', 'lww' + k) + '<div class="acts"><button data-lwd="' + k + '">🗑 ' + tt('ہٹائیں', 'Remove') + '</button></div></div>').join('') + '<div class="acts"><button id="lwadd">＋ ' + tt('نام پٹی جوڑیں', 'Add name tag') + '</button></div>';
+    h += '<h4>🗣️ ' + tt('سین کی آواز', 'Scene voice-over') + '</h4>' + chips([['phone', tt('فون کی آواز', 'Phone voice')], ['gemini', tt('AI آواز', 'AI voice')]], sVoice, 'sv') + (sVoice === 'gemini' ? chips(AI.VOICES, sGv, 'sg') : '') + '<div class="acts"><button id="svmk">🗣️ ' + tt('سب کارڈز کی آواز بنائیں', 'Make voice for all cards') + '</button></div><div class="mut">' + tt('ہر سین کے "بولنے کا متن" یا اس کے عنوان کو پڑھا جاتا ہے۔', 'Each scene reads its "voice-over text", or its headline.') + '</div>';
+    pn.innerHTML = h;
+    $$('[data-ns]', pn).forEach(x => x.onclick = () => { const c = P.newCard(x.dataset.ns), at = Math.max(0, p.clips.indexOf(curClip())) + 1; c.thumb = CD.thumb(c, p, { logo: b.logo }); REG[c.id] = c; p.clips.splice(at, 0, c); sel.clip = c.id; fixFirst(); commit(); tab = 'clips'; $$('#tabs button').forEach(y => y.classList.toggle('on', y.dataset.t === 'clips')); paintTL(); paintPanel(); });
+    $$('[data-th]', pn).forEach(x => x.onclick = () => { p.theme = x.dataset.th; p.clips.forEach(c => { if (c.kind === 'c') c.thumb = CD.thumb(c, p, { logo: b.logo }); }); commit(); paintPanel(); });
+    $('#bron').onchange = e => { b.on = e.target.checked; commit(); };
+    [['brname', 'name'], ['brhead', 'header'], ['brfoot', 'footer']].forEach(([id, k]) => { const el = $('#' + id); el.oninput = () => { b[k] = el.value; if (k === 'name' && !b.footer) { /* keep */ } E.invalidate(); }; el.onchange = () => commit(); });
+    $('#brlogo').onclick = () => pickImage(async f => { try { b.logo = await TP.logoFromFile(f); b.on = true; commit(); paintPanel(); } catch (e) { S.toast('لوگو نہیں کھلا', 'Could not open the logo'); } });
+    if ($('#brrm')) $('#brrm').onclick = () => { b.logo = ''; commit(); paintPanel(); };
+    $('#brsave').onclick = () => { TP.saveBrand({ on: true, name: b.name, header: b.header, footer: b.footer, logo: b.logo }); S.toast('برانڈ کٹ محفوظ ہو گئی', 'Brand kit saved'); };
+    $('#tkon').onchange = e => { p.ticker = Object.assign({ label: S.lang === 'ur' ? 'تازہ' : 'LIVE', text: '' }, p.ticker, { on: e.target.checked }); commit(); paintPanel(); };
+    if (tk.on && $('#tklab')) { $('#tklab').oninput = e => { p.ticker.label = e.target.value; E.invalidate(); }; $('#tklab').onchange = () => commit(); $('#tktxt').oninput = e => { p.ticker.text = e.target.value; E.invalidate(); }; $('#tktxt').onchange = () => commit(); }
+    (p.lowers || []).forEach((lw, k) => {
+      const n = $('#lwn' + k), r = $('#lwr' + k); n.oninput = () => { lw.name = n.value; E.invalidate(); }; r.oninput = () => { lw.role = r.value; E.invalidate(); }; n.onchange = r.onchange = () => commit();
+      $$('[data-lwy' + k + ']', pn).forEach(x => x.onclick = () => { lw.y = +x.dataset['lwy' + k]; commit(); paintPanel(); });
+      $$('[data-lww' + k + ']', pn).forEach(x => x.onclick = () => { const a = x.dataset['lww' + k] === 'all'; lw.all = a; lw.clip = a ? null : (sel.clip || null); commit(); paintPanel(); });
+    });
+    $$('[data-lwd]', pn).forEach(x => x.onclick = () => { p.lowers.splice(+x.dataset.lwd, 1); commit(); paintPanel(); });
+    $('#lwadd').onclick = () => { (p.lowers = p.lowers || []).push(P.newLower({ name: S.lang === 'ur' ? 'نام' : 'Name', role: S.lang === 'ur' ? 'عہدہ' : 'Role', clip: sel.clip })); commit(); paintPanel(); const c = curClip(); if (c) E.seek(c.t0 + c.d + 1); };
+    $$('[data-sv]', pn).forEach(x => x.onclick = () => { sVoice = x.dataset.sv; paintPanel(); }); $$('[data-sg]', pn).forEach(x => x.onclick = () => { sGv = x.dataset.sg; paintPanel(); });
+    $('#svmk').onclick = async () => {
+      if (sVoice === 'gemini' && !AI.enabled()) { S.toast('پہلے AI key ڈالیں', 'Add the AI key first'); return; }
+      const w = document.createElement('div'); w.className = 'dlg'; w.innerHTML = '<div class="dbox"><h3>🗣️ ' + tt('آواز بن رہی ہے', 'Making the voice') + '</h3><div class="dbody" id="vpm">…</div><div class="bar"><i id="vpb"></i></div></div>'; document.body.appendChild(w);
+      try { await TP.makeVoices(p, sVoice, { voice: sGv }, (i, n) => { $('#vpm').textContent = i + '/' + n; $('#vpb').style.width = Math.round(100 * i / Math.max(1, n)) + '%'; }); p.voice.forEach(v => { VREG[v.id] = v; }); p._musBuf = null; commit(); S.stat('voice_cards'); }
+      catch (e) { S.toast(AI.errText(e), undefined, 5000); }
+      w.remove(); paintAll();
+    };
   }
 
   /* ---------- save / leave ---------- */

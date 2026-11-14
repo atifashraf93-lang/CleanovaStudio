@@ -11,25 +11,32 @@
     return {
       id: S.uid(), name: '', fmt: '9:16', res: 720, fit: 'blur', filter: 'none', filterAmt: 1, overlay: 'none', overlayAmt: 1, autoColor: true,
       clips: [], texts: [], stickers: [], voice: [], lines: [], style: 'family', credit: true,
-      music: { kind: 'none', mood: 'calm', seed: 1, vol: .55, start: 0, duck: true }, vvol: 1, created: Date.now()
+      music: { kind: 'none', mood: 'calm', seed: 1, vol: .55, start: 0, duck: true }, vvol: 1, created: Date.now(),
+      theme: 'neon', brand: { on: false, name: '', header: '', footer: '', logo: '' }, ticker: null, lowers: []
     };
   };
   P.newClip = function (o) {
     return Object.assign({ id: S.uid(), kind: 'i', name: '', in: 0, out: 0, speed: 1, len: 3, mute: false, freeze: false, fit: null, anim: { in: 'none', mid: 'none', out: 'none' }, vfx: 'none', trans: { type: 'fade', dur: .6 }, adj: null, score: 1, date: Date.now(), dur: 0, sw: 0, sh: 0 }, o || {});
   };
+  P.newCard = function (type, over, len) {
+    const C = S.cards, t = C.TYPES[type];
+    return P.newClip({ kind: 'c', name: S.lang === 'ur' ? t.n[0] : t.n[1], len: len || t.len, card: C.makeCard(type, over), cfiles: [null, null], trans: { type: 'fade', dur: .5 }, anim: { in: 'none', mid: 'none', out: 'none' } });
+  };
+  P.newLower = function (o) { return Object.assign({ id: S.uid(), name: '', role: '', y: .8, clip: null, all: false, t0: 0, t1: 4 }, o || {}); };
   P.newText = function (o) {
     return Object.assign({ id: S.uid(), text: '', x: .5, y: .5, size: 7, font: 'sans', bold: true, color: '#ffffff', stroke: '', bg: '', shadow: true, w: .86, in: 'fade', mid: 'none', out: 'fade', clip: null, at: null, t0: 0, t1: 3, all: false, rot: 0 }, o || {});
   };
   P.newSticker = function (o) {
     return Object.assign({ id: S.uid(), ref: 'e:✨', x: .5, y: .5, size: 18, rot: 0, anim: 'pop', clip: null, t0: 0, t1: 3, all: false, x1: null, y1: null }, o || {});
   };
-  const RT = ['an', 'file', 'url', 'el', 'bmp', 'thumb', 'frames', 'node', 'gain', 'buf', 'blob', '_musBuf', '_bmpLoading', '_pre', '_seeking'];
+  const RT = ['an', 'file', 'url', 'el', 'bmp', 'thumb', 'frames', 'node', 'gain', 'buf', 'blob', '_musBuf', '_bmpLoading', '_pre', '_seeking', 'cfiles', 'cbmp', '_cLoading'];
   P.serialize = function (p) {
     return JSON.stringify(p, (k, v) => (RT.indexOf(k) >= 0 || (k[0] === '_' && k !== '_x') ? undefined : v));
   };
   P.blobsOf = function (p) {
     const m = {};
     p.clips.forEach(c => { if (c.file) m['c:' + c.id] = c.file; });
+    p.clips.forEach(c => { if (c.cfiles) c.cfiles.forEach((f, i) => { if (f) m['f' + i + ':' + c.id] = f; }); });
     p.voice.forEach(v => { if (v.blob) m['v:' + v.id] = v.blob; });
     if (p.music.file) m['m:file'] = p.music.file;
     return m;
@@ -37,13 +44,16 @@
   P.restore = async function (json, blobs) {
     const p = JSON.parse(json);
     p.clips.forEach(c => { const f = blobs['c:' + c.id]; if (f) { c.file = f; c.url = URL.createObjectURL(f); } });
+    p.clips.forEach(c => { if (c.kind === 'c') { c.cfiles = [blobs['f0:' + c.id] || null, blobs['f1:' + c.id] || null]; } });
     p.voice.forEach(v => { const b = blobs['v:' + v.id]; if (b) v.blob = b; });
+    if (!p.brand) p.brand = { on: false, name: '', header: '', footer: '', logo: '' }; if (!p.lowers) p.lowers = []; if (!p.theme) p.theme = 'neon';
     if (blobs['m:file']) p.music.file = blobs['m:file'];
     /* thumbs for placeholders */
-    for (const c of p.clips) { try { await P.makeThumb(c); } catch (e) { /* ignore */ } }
+    for (const c of p.clips) { try { if (c.kind === 'c') c.thumb = S.cards.thumb(c, p); else await P.makeThumb(c); } catch (e) { /* ignore */ } }
     return p;
   };
   P.makeThumb = async function (c) {
+    if (c.kind === 'c') return c.thumb;
     const tc = document.createElement('canvas'); const k = 220 / Math.max(c.sw || 220, c.sh || 220); tc.width = Math.max(2, Math.round((c.sw || 220) * k)); tc.height = Math.max(2, Math.round((c.sh || 220) * k));
     const x = tc.getContext('2d');
     if (c.kind === 'i') { const im = await createImageBitmap(c.file, { resizeWidth: tc.width, resizeHeight: tc.height }); x.drawImage(im, 0, 0, tc.width, tc.height); im.close && im.close(); }
@@ -88,7 +98,7 @@
       }
       it._t0 = it.t0; it._t1 = Math.max(it.t0 + .5, it.t1);
     };
-    p.texts.forEach(resolve); p.stickers.forEach(resolve);
+    p.texts.forEach(resolve); p.stickers.forEach(resolve); (p.lowers || []).forEach(resolve);
     p.voice.forEach(v => { if (v.at === 'end') v._t = Math.max(0, p.dur - (v.buf ? v.buf.duration : 2.5) - .5); else if (v.at === 'start') v._t = .25; else if (v.clip) { const c = p.clips.find(x => x.id === v.clip); v._t = c ? c.t0 + c.d + .15 : (v.t || 0); } else v._t = v.t || 0; });
     return p.dur;
   };
@@ -142,6 +152,7 @@
       const p = this.p; if (!p) return;
       for (const c of p.clips) {
         const near = t >= c.t0 - 1.6 && t <= c.t1 + .3, far = t < c.t0 - 4 || t > c.t1 + 1.2;
+        if (c.kind === 'c') { if (near) this.loadCard(c); continue; }
         if (c.kind === 'i') { if (near) this.loadBmp(c); else if (far && c.bmp) { try { c.bmp.close(); } catch (e) { /* ignore */ } c.bmp = null; } continue; }
         if (near && !c.el && !c.bad) this.mkVideo(c);
         else if (far && c.el) { this.relClip(c); continue; }
@@ -164,9 +175,13 @@
         }
       }
     }
+    loadCard(c) {
+      if (!c.cfiles || c._cLoading) return; if (!c.cbmp) c.cbmp = [null, null];
+      c.cfiles.forEach((f, i) => { if (f && !c.cbmp[i] && !c['_cl' + i]) { c['_cl' + i] = true; createImageBitmap(f, { resizeWidth: 900 }).then(b => { c.cbmp[i] = b; this.dirty = true; }).catch(() => { c.cbmp[i] = null; }); } });
+    }
     ready(t) {
       const p = this.p; if (!p) return true;
-      for (const c of p.clips) { if (t >= c.t0 - .05 && t < c.t1) { if (c.kind === 'v') { if (!c.el || c.el.readyState < 2 || c._seeking) return false; } else if (!c.bmp && !c.bad) return false; } }
+      for (const c of p.clips) { if (t >= c.t0 - .05 && t < c.t1) { if (c.kind === 'c') { if (c.cfiles && c.cfiles.some((f, i) => f && !(c.cbmp && c.cbmp[i]))) return false; } else if (c.kind === 'v') { if (!c.el || c.el.readyState < 2 || c._seeking) return false; } else if (!c.bmp && !c.bad) return false; } }
       return true;
     }
 
@@ -174,11 +189,14 @@
     source(c) {
       if (c.kind === 'i' && c.bmp) return { el: c.bmp, w: c.bmp.width, h: c.bmp.height };
       if (c.kind === 'v' && c.el && c.el.readyState >= 2 && c.el.videoWidth) return { el: c.el, w: c.el.videoWidth, h: c.el.videoHeight };
+      if (c.kind === 'c') return null;
       if (c.thumb) return { el: c.thumb, w: c.thumb.width, h: c.thumb.height };
       return null;
     }
     layer(ctx, c, t) {
       const W = this.W, H = this.H, p = this.p, u = Math.max(0, t - c.t0), len = c.len, src = this.source(c);
+      if (c.kind === 'c') { ctx.save(); S.cards.drawCard(ctx, c, p, u, W, H, { imgs: c.cbmp || [], logo: p.brand && p.brand.logo }); ctx.restore(); return; }
+      if (src && c.hl && c.hl.on) { this.layerHL(ctx, c, t, u, src); return; }
       if (!src) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); return; }
       const seed = parseInt(c.id.slice(-3), 36) || 0;
       const fin = Math.min(.5, len * .3), fout = Math.min(.5, len * .3);
@@ -214,6 +232,18 @@
       }
       ctx.restore();
     }
+    layerHL(ctx, c, t, u, src) {
+      const W = this.W, H = this.H, p = this.p, fin = Math.min(.5, c.len * .3); let a = 1; const an = c.anim || {};
+      const ga = ctx.globalAlpha; ctx.save();
+      S.cards.drawHL(ctx, c, p, u, W, H, (x, R) => {
+        const cover = Math.max(R.w / src.w, R.h / src.h); let s = cover;
+        const mid = an.mid && FX.MID[an.mid]; let m = mid ? mid(cl(u / c.len), u, 3) : null; if (m) s *= m.s;
+        if (c.vfx === 'punch') s *= 1 + .1 * Math.pow(Math.max(0, Math.sin(u * Math.PI / .75)), 3);
+        const filt = FX.filterCSS(p.filter, p.filterAmt, p.autoColor ? c.adj : null); if (filt !== 'none') x.filter = filt;
+        x.translate(R.x + R.w / 2 + (m ? m.tx * R.w : 0), R.y + R.h / 2 + (m ? m.ty * R.h : 0)); x.drawImage(src.el, -src.w * s / 2, -src.h * s / 2, src.w * s, src.h * s);
+      }, p.clips);
+      ctx.restore(); ctx.globalAlpha = ga;
+    }
     render(t) {
       const p = this.p, c = this.c, W = this.W, H = this.H; if (!p) return;
       c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.filter = 'none'; c.globalCompositeOperation = 'source-over'; c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
@@ -230,6 +260,9 @@
       this.hits = [];
       p.stickers.forEach(st => { if (t >= st._t0 && t <= st._t1) { c.save(); const h = FX.drawSticker(c, st, t, st._t0, st._t1, W, H); c.restore(); if (h) { h.kind = 'sticker'; h.id = st.id; this.hits.push(h); } } });
       p.texts.forEach(it => { if (it.text && t >= it._t0 && t <= it._t1) { const h = FX.drawText(c, it, t, it._t0, it._t1, W, H); if (h) { h.kind = 'text'; h.id = it.id; this.hits.push(h); } } });
+      if (p.ticker && p.ticker.on && p.ticker.text) S.cards.drawTicker(c, p.ticker, t, W, H);
+      (p.lowers || []).forEach(lw => { if ((lw.name || lw.role) && t >= lw._t0 && t <= lw._t1) S.cards.drawLower(c, lw, t, lw._t0, lw._t1, W, H, p); });
+      if (p.brand && p.brand.on) S.cards.bar(c, p, W, H);
       if (p.credit) FX.credit(c, W, H, t, p.dur, 'Developed by SMAA');
       if (!this.exporting && this.sel) {
         const h = this.hits.find(x => x.id === this.sel);

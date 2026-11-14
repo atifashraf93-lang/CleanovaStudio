@@ -28,7 +28,7 @@ jobs:
       - name: Prepare web folder
         run: |
           mkdir -p www
-          cp index.html style.css core.js fx.js music.js engine.js auto.js ai.js stats.js updater.js app.js editor.js manifest.webmanifest icon.svg icon-192.png icon-512.png www/
+          cp index.html style.css core.js fx.js music.js engine.js cards.js templates.js auto.js ai.js stats.js updater.js app.js editor.js manifest.webmanifest icon.svg icon-192.png icon-512.png www/
           cp -r fonts www/fonts
 
       - name: Install dependencies
