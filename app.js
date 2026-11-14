@@ -221,7 +221,7 @@
       }
       if (p.music.kind === 'synth') { msg(tt('موسیقی بنا رہا ہوں…', 'Composing the music…'), .94); try { await S.music.get(p.music.mood, 1); } catch (e) { p.music.kind = 'none'; } }
       if (ac.signal.aborted) return; dlg.remove(); P.layout(p); AV.media = []; app.go('editor', { p, fresh: true, note });
-    } catch (e) { dlg.remove(); if (!ac.signal.aborted) S.toast(AI.errText(e), undefined, 6000); }
+    } catch (e) { dlg.remove(); if (!ac.signal.aborted) S.dialog({ title: '⚠️ ' + tt('ویڈیو نہیں بن سکی', 'Could not create the video'), text: AI.errText(e) + (e && e.message && e.message !== e.kind ? '\n\n(' + String(e.message).slice(0, 160) + ')' : '') }); }
   }
 
   /* ============ WIZARD ============ */
