@@ -167,6 +167,40 @@
     const m = o.music || 'auto'; p.music = m === 'none' ? { kind: 'none' } : m === 'file' && o.musicFile ? { kind: 'file', file: o.musicFile, mood: 'calm', vol: .5, start: 0, duck: true } : { kind: 'synth', mood: m === 'auto' ? t.mood : m, seed: 1, vol: .5, start: 0, duck: true };
     P.layout(p); return p;
   };
+
+  /* ---------------- build from an AI plan ---------------- */
+  TP.buildAI = function (r, o) {
+    o = o || {}; const p = P.newProject(), TY = C.TYPES;
+    p.fmt = o.fmt || '9:16'; p.res = o.res || 720; p.credit = o.credit !== false; p.fit = 'fit'; p.autoColor = true; p.style = 'cinema'; p.kind = 'promo'; p.tpl = 'ai';
+    p.theme = C.THEMES[r.theme] ? r.theme : 'neon'; p.name = String(r.name || o.prompt || 'Video').slice(0, 40);
+    const br = Object.assign(TP.brand(), o.brand || {}), org = String(r.org || '').trim() || br.name || '';
+    p.brand = { on: o.brandOn !== false && !!(org || br.logo || br.header || br.footer), name: org, header: br.header || '', footer: br.footer || org, logo: br.logo || '' };
+    const TRS2 = ['fade', 'slideL', 'zoomIn', 'dissolve', 'wipeL', 'pushL']; let idx = 0; const cards = [];
+    (r.scenes || []).slice(0, 10).forEach(sc => {
+      const type = String(sc.type || ''); if (!TY[type]) return; const ok = {}; C.fields(type).forEach(f => { ok[f.k] = 1; }); const ov = {};
+      Object.keys(sc.data || {}).forEach(k => { if (ok[k] && sc.data[k] !== undefined && sc.data[k] !== null) ov[k] = String(sc.data[k]).replace(/\\n/g, '\n'); });
+      const base = C.makeData(type); Object.keys(ok).forEach(k => { if (ov[k] === undefined && !/^img/.test(k)) base[k] = ''; });
+      if (type === 'countdown' && !/^\d{4}-\d{2}-\d{2}$/.test(ov.date || '')) ov.date = '';
+      const c = P.newCard(type, ov); Object.keys(ok).forEach(k => { if (ov[k] === undefined && !/^img/.test(k)) c.card.data[k] = ''; });
+      if (type === 'countdown' && !c.card.data.date) c.card.data.date = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+      if (type === 'list' && !c.card.data.numbered) c.card.data.numbered = '1';
+      c.card.data.say = String(sc.say || '').trim(); c.trans = { type: TRS2[idx++ % TRS2.length], dur: .5 };
+      const text = Object.values(c.card.data).join(' ').length; c.len = Math.max(3.4, Math.min(8.5, c.len * .6 + text / 60)); cards.push(c);
+    });
+    if (!cards.length) throw new Error('no scenes');
+    if (cards[cards.length - 1].card.type !== 'outro' && (org || br.logo)) { const c = P.newCard('outro', { name: org, tag: '', handle: '' }); c.trans = { type: 'fade', dur: .5 }; cards.push(c); }
+    const media = (o.media || []).filter(Boolean), mc = [];
+    media.forEach((c, i) => {
+      c.hl = { on: true, chip: '', title: '', num: 0, sub: '', chips: '' };
+      if (c.kind === 'v') { const w = S.auto.window(c, Math.min(c.dur, 5)); c.in = w[0]; c.out = Math.min(c.dur, w[0] + Math.min(5, c.dur)); if (c.out - c.in < .5) { c.in = 0; c.out = c.dur; } c.len = c.out - c.in; } else c.len = 3.4;
+      c.trans = { type: TRS2[idx++ % TRS2.length], dur: .45 }; c.anim = { in: 'none', mid: i % 2 ? 'zoomOut' : 'zoomIn', out: 'none' }; mc.push(c);
+    });
+    const at = Math.min(1, cards.length - 1); p.clips = cards.slice(0, at).concat(mc, cards.slice(at));
+    if (r.ticker && String(r.ticker).trim()) p.ticker = { on: true, label: S.lang === 'ur' ? 'تازہ' : 'LIVE', text: String(r.ticker).trim() };
+    const m = o.music || 'auto'; const moods = ['calm', 'happy', 'travel', 'emotional', 'islamic', 'epic', 'party'];
+    p.music = m === 'none' ? { kind: 'none' } : m === 'file' && o.musicFile ? { kind: 'file', file: o.musicFile, mood: 'calm', vol: .5, start: 0, duck: true } : { kind: 'synth', mood: m === 'auto' ? (moods.indexOf(r.mood) >= 0 ? r.mood : 'happy') : m, seed: 1, vol: .5, start: 0, duck: true };
+    P.layout(p); p.clips.forEach(c => { if (c.kind === 'c') c.thumb = C.thumb(c, p, { logo: p.brand.logo }); }); return p;
+  };
   /* voice-over: reads each card's "say" text (or its headline) */
   TP.cardSay = c => { const d = c.card && c.card.data; if (!d) return ''; if (d.say && d.say.trim()) return d.say.trim(); const k = ['headline', 'title', 'text', 'big', 'name'].find(x => d[x] && String(d[x]).trim()); return k ? String(d[k]).replace(/\s*\n\s*/g, '. ') : ''; };
   TP.makeVoices = async function (p, mode, opt, onProg, signal) {

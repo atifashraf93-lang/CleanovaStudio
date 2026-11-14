@@ -20,6 +20,7 @@
     root().innerHTML = '<div class="scr">' + top('Cleanova Studio<small>Developed by SMAA</small>', false, langBox() + '<button class="ib" id="gear" aria-label="Settings">⚙️</button>') + '<div class="body">' +
       '<button class="big" id="nw"><span class="ico">🎬</span><div><b>' + tt('نئی ویڈیو، خود بخود ایڈٹ', 'New video, edited for you') + '</b><span>' + tt('فوٹو اور ویڈیو چنیں، باقی کام ایپ کرے گی', 'Pick photos and videos, the app does the rest') + '</span></div></button>' +
       '<button class="big alt" id="ns"><span class="ico">✍️</span><div><b>' + tt('اسکرپٹ سے ویڈیو', 'Video from a script') + '</b><span>' + tt('اپنی لکھی لائنیں دیں، ہر لائن ایک سین بنے گی', 'Give your lines, each line becomes a scene') + '</span></div></button>' +
+      '<button class="big alt3" id="av"><span class="ico">✨</span><div><b>' + tt('پرامپٹ لکھیں، ویڈیو تیار', 'Write a prompt, get a video') + '</b><span>' + tt('بس بتائیں کیا چاہیے، AI سین، آواز اور موسیقی خود بنا دے گا', 'Just describe it; the AI builds scenes, voice and music') + '</span></div></button>' +
       '<button class="big alt2" id="np"><span class="ico">📣</span><div><b>' + tt('پروموشن · ایونٹ · سوشل · آگاہی', 'Promo · Event · Social · Awareness') + '</b><span>' + tt('تیار ٹیمپلیٹس: شادی، ورکشاپ، سیل، خبر، اپیل اور بہت کچھ', 'Ready templates: wedding, workshop, sale, news, appeal and more') + '</span></div></button>' +
       '<div class="row" style="margin-top:12px"><button class="mini" id="pj"><span class="ico">📁</span><span>' + tt('میرے پروجیکٹ', 'My projects') + '</span></button><button class="mini" id="mv"><span class="ico">🎞️</span><span>' + tt('میری ویڈیوز', 'My videos') + (nv ? ' (' + nv + ')' : '') + '</span></button></div>' +
       '<div class="card"><h3>' + (aiOn ? '🤖 ' + tt('AI موڈ چالو ہے', 'AI mode is on') : '🤖 ' + tt('AI موڈ بند ہے', 'AI mode is off')) + '</h3><div class="mut">' + (aiOn ? tt('AI کلپس دیکھ کر اسکرپٹ کی ہر لائن صحیح کلپ پر لگائے گی۔', 'AI will look at your clips and put each script line on the right clip.') : tt('بغیر AI بھی سب چلتا ہے۔ AI کے لیے Settings میں اپنی مفت key ڈالیں۔', 'Everything works without AI. For AI, add your own free key in Settings.')) + '</div></div>' +
@@ -27,6 +28,7 @@
     bindLang(); $('#gear').onclick = () => app.go('settings');
     $('#nw').onclick = () => { resetWiz(); app.go('wizard'); S.stat('wizard'); };
     $('#ns').onclick = () => { resetWiz(); W.focusScript = true; app.go('wizard'); S.stat('wizard'); };
+    $('#av').onclick = () => app.go('aivid');
     $('#np').onclick = () => { app.go('tpls'); S.stat('tpls'); };
     $('#pj').onclick = () => app.go('projects'); $('#mv').onclick = () => app.go('videos');
   };
@@ -84,7 +86,7 @@
   };
 
   /* ============ TEMPLATES ============ */
-  const TP = S.tpl, CD = S.cards; let TC = 'social', TF = null;
+  const TP = S.tpl, CD = S.cards; let TC = 'social', TF = null, MS = null;
   SCR.tpls = function () {
     const cats = TP.CATS.map(c => [c[0], c[2] + ' ' + c[1][S.lang === 'ur' ? 0 : 1]]);
     const list = TP.LIST.filter(t => t.cat === TC);
@@ -100,18 +102,18 @@
     TF = { t, vals: { org: br.name || '', date_iso: '' }, media: [], loading: 0, fmt: sv.fmt || '9:16', res: S.get('res', 720), music: 'auto', musicFile: null, voice: 'none', gvoice: 'Kore', brandOn: true, credit: S.get('credit', true) !== false };
   }
   async function addTplMedia(files) {
-    files = Array.from(files || []); if (!files.length) return; TF.loading += files.length; paintTM();
-    for (const f of files) { try { const c = await A.loadFile(f, false); c.adj = A.adjFor(c); TF.media.push(c); } catch (e) { S.toast('فائل نہیں کھلی', 'Could not open a file'); } TF.loading--; paintTM(); }
+    files = Array.from(files || []); if (!files.length) return; MS.loading += files.length; paintTM();
+    for (const f of files) { try { const c = await A.loadFile(f, false); c.adj = A.adjFor(c); MS.media.push(c); } catch (e) { S.toast('فائل نہیں کھلی', 'Could not open a file'); } MS.loading--; paintTM(); }
   }
   function paintTM() {
     const box = $('#tm'); if (!box) return;
-    box.innerHTML = '<div class="grid">' + TF.media.map(c => '<div class="tile"><canvas data-th="' + c.id + '"></canvas><button class="x" data-x="' + c.id + '">✕</button><span class="k">' + (c.kind === 'v' ? '🎥' : '📷') + '</span></div>').join('') + '<button class="tile add" id="tadd">' + (TF.loading ? '<span class="spin"></span>' : '＋') + '</button></div>';
-    TF.media.forEach(c => { const cv = box.querySelector('[data-th="' + c.id + '"]'); if (cv && c.thumb) { cv.width = c.thumb.width; cv.height = c.thumb.height; cv.getContext('2d').drawImage(c.thumb, 0, 0); } });
-    $$('[data-x]', box).forEach(b => b.onclick = () => { TF.media = TF.media.filter(c => c.id !== b.dataset.x); paintTM(); });
+    box.innerHTML = '<div class="grid">' + MS.media.map(c => '<div class="tile"><canvas data-th="' + c.id + '"></canvas><button class="x" data-x="' + c.id + '">✕</button><span class="k">' + (c.kind === 'v' ? '🎥' : '📷') + '</span></div>').join('') + '<button class="tile add" id="tadd">' + (MS.loading ? '<span class="spin"></span>' : '＋') + '</button></div>';
+    MS.media.forEach(c => { const cv = box.querySelector('[data-th="' + c.id + '"]'); if (cv && c.thumb) { cv.width = c.thumb.width; cv.height = c.thumb.height; cv.getContext('2d').drawImage(c.thumb, 0, 0); } });
+    $$('[data-x]', box).forEach(b => b.onclick = () => { MS.media = MS.media.filter(c => c.id !== b.dataset.x); paintTM(); });
     $('#tadd').onclick = () => $('#tfm').click();
   }
   SCR.tplform = async function () {
-    if (!TF) { SCR.tpls(); return; }
+    if (!TF) { SCR.tpls(); return; } MS = TF;
     const t = TF.t, aiOn = AI.enabled(), br = TP.brand(); const info = TF.voice === 'phone' ? await AI.phoneInfo() : null;
     const moodItems = [['auto', tt('خود', 'Auto')]].concat(S.music.list.map(m => [m, S.music.MOODS[m].n[S.lang === 'ur' ? 0 : 1]])).concat([['file', TF.musicFile ? '🎵 ' + TF.musicFile.name.slice(0, 14) : tt('میرا گانا', 'My own song')], ['none', tt('بغیر موسیقی', 'No music')]]);
     const pk = v => (Array.isArray(v) ? v[S.lang === 'ur' ? 0 : 1] : v);
@@ -160,6 +162,64 @@
       if (ac.signal.aborted) return; dlg.remove(); P.layout(p);
       app.go('editor', { p, fresh: true, note });
     } catch (e) { dlg.remove(); if (!ac.signal.aborted) S.toast('خرابی: ' + (e.message || e), 'Error: ' + (e.message || e), 5000); }
+  }
+
+  /* ============ PROMPT -> VIDEO ============ */
+  let AV = null;
+  const AV_EX = [['🎓', 'ورکشاپ', 'Workshop', 'ہمارے اسکول میں 13 اور 14 نومبر کو شام 6 سے 8 بجے مفت ڈیجیٹل مارکیٹنگ ورکشاپ ہے، مقام ابو تراب اسکول کراچی، رابطہ 0300-1234567', 'Free digital marketing workshop at our school on 13 and 14 November, 6 to 8 PM, Abu Turab School Karachi, call 0300-1234567'],
+    ['💍', 'ولیمہ', 'Walima', 'احمد اور سارہ کے ولیمہ کی دعوت، ہفتہ 20 دسمبر شام 7 بجے، رائل ہال لاہور', 'Walima invitation for Ahmed and Sara, Saturday 20 December at 7 PM, Royal Hall Lahore'],
+    ['🛍️', 'سیل', 'Sale', 'ہماری کپڑوں کی دکان پر 40 فیصد سیل، ہفتے تک، دکان مین بازار سیالکوٹ', 'Clothes shop 40% off sale until Sunday, Main Bazaar Sialkot'],
+    ['🚨', 'آگاہی', 'Awareness', 'ہماری گلی میں پانی کی قلت کا مسئلہ، دو ہفتے سے پانی نہیں آ رہا، انتظامیہ سے مطالبہ ہے کہ فوری حل کرے', 'Water shortage in our street, no water for two weeks, we demand the authorities fix it urgently']];
+  function newAV() { const br = TP.brand(), sv = S.get('wiz', {}); AV = { prompt: '', lang: S.lang === 'ur' ? 'ur' : 'en', size: 'mid', media: [], loading: 0, fmt: sv.fmt || '9:16', res: S.get('res', 720), music: 'auto', musicFile: null, voice: 'none', gvoice: 'Kore', brandOn: true, credit: S.get('credit', true) !== false }; }
+  SCR.aivid = async function () {
+    if (!AV) newAV(); MS = AV; const aiOn = AI.enabled();
+    const moodItems = [['auto', tt('خود', 'Auto')]].concat(S.music.list.map(m => [m, S.music.MOODS[m].n[S.lang === 'ur' ? 0 : 1]])).concat([['file', AV.musicFile ? '🎵 ' + AV.musicFile.name.slice(0, 14) : tt('میرا گانا', 'My own song')], ['none', tt('بغیر موسیقی', 'No music')]]);
+    root().innerHTML = '<div class="scr">' + top('✨ ' + tt('پرامپٹ سے ویڈیو', 'Video from a prompt'), true, langBox()) + '<div class="body">' +
+      (aiOn ? '' : '<div class="card warn"><b>⚠️ ' + tt('AI key ضروری ہے', 'AI key needed') + '</b><div class="mut">' + tt('یہ فیچر انٹرنیٹ اور آپ کی اپنی مفت Gemini key سے چلتا ہے۔ Settings میں key ڈالیں۔', 'This feature needs internet and your own free Gemini key. Add it in Settings.') + '</div><div class="acts"><button id="avset">⚙️ ' + tt('Settings کھولیں', 'Open Settings') + '</button></div></div>') +
+      '<div class="card"><h3>1️⃣ ' + tt('کیسی ویڈیو چاہیے؟ لکھیں', 'Describe the video you want') + '</h3><textarea id="avp" rows="6" dir="auto" placeholder="' + esc(tt('مثال: ہماری ورکشاپ 13 نومبر کو شام 6 بجے ابو تراب اسکول میں ہے، مفت ہے، رابطہ 0300-1234567', 'Example: Our workshop is on 13 November at 6 PM at Abu Turab School, it is free, call 0300-1234567')) + '">' + esc(AV.prompt) + '</textarea>' +
+      '<div class="mut">' + tt('جتنی تفصیل (نام، تاریخ، جگہ، فون) دیں گے ویڈیو اتنی درست بنے گی۔ جو نہیں بتائیں گے وہ ایپ خود نہیں گھڑے گی۔', 'The more detail you give (names, date, place, phone) the better. Anything you leave out is not invented.') + '</div>' +
+      '<div class="lbl">' + tt('مثالیں (چھو کر بھریں)', 'Examples (tap to fill)') + '</div><div class="chips">' + AV_EX.map((x, i) => '<button class="chip" data-ex="' + i + '">' + x[0] + ' ' + x[S.lang === 'ur' ? 1 : 2] + '</button>').join('') + '</div></div>' +
+      '<div class="card"><h3>2️⃣ ' + tt('زبان اور لمبائی', 'Language and length') + '</h3>' + chips([['ur', 'اردو'], ['roman', 'Roman Urdu'], ['en', 'English']], AV.lang, 'lng') + chips([['short', tt('چھوٹی', 'Short')], ['mid', tt('درمیانی', 'Medium')], ['long', tt('لمبی', 'Long')]], AV.size, 'siz') + '</div>' +
+      '<div class="card"><h3>3️⃣ ' + tt('اپنی تصاویر / ویڈیو (اختیاری)', 'Your photos / videos (optional)') + '</h3><div id="tm"></div><input type="file" id="tfm" accept="image/*,video/*" multiple hidden></div>' +
+      '<div class="card"><h3>4️⃣ ' + tt('موسیقی، آواز، فارمیٹ', 'Music, voice, format') + '</h3>' + chips(moodItems, AV.music, 'mus') + '<input type="file" id="tmf" accept="audio/*" hidden>' +
+      '<div class="lbl">' + tt('وائس اوور', 'Voice-over') + '</div>' + chips([['none', tt('نہیں', 'None')], ['phone', tt('فون کی آواز', 'Phone voice')], ['gemini', tt('AI آواز', 'AI voice')]], AV.voice, 'voi') + (AV.voice === 'gemini' ? chips(AI.VOICES, AV.gvoice, 'gv') : '') +
+      chips(FMT(), AV.fmt, 'fmt') + chips([[720, '720p'], [1080, '1080p']], AV.res, 'res') + '<label class="sw"><span>' + tt('لوگو / برانڈ پٹی لگائیں', 'Add logo / brand bar') + '</span><input type="checkbox" id="tbr"' + (AV.brandOn ? ' checked' : '') + '></label></div>' +
+      '<button class="pri big2" id="avgo">✨ ' + tt('ویڈیو تیار کریں', 'Create the video') + '</button><div class="credit">Developed by SMAA</div></div></div>';
+    bindLang(); $('#bk').onclick = () => app.go('home'); paintTM();
+    if ($('#avset')) $('#avset').onclick = () => app.go('settings');
+    $('#avp').oninput = e => { AV.prompt = e.target.value; };
+    $$('[data-ex]').forEach(b => b.onclick = () => { const x = AV_EX[+b.dataset.ex]; AV.prompt = x[S.lang === 'ur' ? 3 : 4]; AV.lang = S.lang === 'ur' ? 'ur' : 'en'; SCR.aivid(); });
+    $$('[data-lng]').forEach(b => b.onclick = () => { AV.lang = b.dataset.lng; SCR.aivid(); }); $$('[data-siz]').forEach(b => b.onclick = () => { AV.size = b.dataset.siz; SCR.aivid(); });
+    $('#tfm').onchange = e => { addTplMedia(e.target.files); e.target.value = ''; };
+    $('#tmf').onchange = e => { const f = e.target.files[0]; if (f) { AV.musicFile = f; AV.music = 'file'; SCR.aivid(); } };
+    $$('[data-mus]').forEach(b => b.onclick = () => { if (b.dataset.mus === 'file') { $('#tmf').click(); return; } AV.music = b.dataset.mus; SCR.aivid(); });
+    $$('[data-voi]').forEach(b => b.onclick = () => { AV.voice = b.dataset.voi; SCR.aivid(); }); $$('[data-gv]').forEach(b => b.onclick = () => { AV.gvoice = b.dataset.gv; SCR.aivid(); });
+    $$('[data-fmt]').forEach(b => b.onclick = () => { AV.fmt = b.dataset.fmt; SCR.aivid(); }); $$('[data-res]').forEach(b => b.onclick = () => { AV.res = +b.dataset.res; SCR.aivid(); });
+    $('#tbr').onchange = e => { AV.brandOn = e.target.checked; };
+    $('#avgo').onclick = makeFromPrompt;
+  };
+  async function makeFromPrompt() {
+    if (AV.loading) { S.toast('تصاویر ابھی لوڈ ہو رہی ہیں', 'Media is still loading'); return; }
+    if (AV.prompt.trim().length < 8) { S.toast('پہلے ویڈیو کے بارے میں لکھیں', 'Write what the video is about first'); return; }
+    if (!AI.enabled()) { S.toast('پہلے Settings میں AI key ڈالیں', 'Add the AI key in Settings first', 4000); return; }
+    if (AV.voice === 'gemini' && !AI.enabled()) return;
+    const ac = new AbortController(); S.stat('prompt_video');
+    const dlg = document.createElement('div'); dlg.className = 'dlg'; dlg.innerHTML = '<div class="dbox"><h3>✨ ' + tt('ویڈیو تیار ہو رہی ہے', 'Creating your video') + '</h3><div class="dbody" id="pm">…</div><div class="bar"><i id="pb"></i></div><div class="dbtn"><button id="pc" class="sec">' + tt('منسوخ', 'Cancel') + '</button></div></div>'; document.body.appendChild(dlg);
+    const msg = (m, q) => { const e = $('#pm'); if (e) e.textContent = m; if (q !== undefined && $('#pb')) $('#pb').style.width = Math.round(q * 100) + '%'; };
+    $('#pc').onclick = () => { ac.abort(); dlg.remove(); };
+    try {
+      msg(tt('AI آپ کی بات سمجھ کر سین بنا رہا ہے…', 'The AI is planning your scenes…'), .15);
+      const r = await AI.makeVideo({ prompt: AV.prompt.trim(), lang: AV.lang, size: AV.size }, ac.signal); if (ac.signal.aborted) return;
+      msg(tt('ڈیزائن بنا رہا ہوں…', 'Designing…'), .5); await S.sleep(30);
+      const p = TP.buildAI(r, { prompt: AV.prompt, fmt: AV.fmt, res: AV.res, music: AV.music, musicFile: AV.musicFile, media: AV.media.slice(), credit: AV.credit, brandOn: AV.brandOn }); let note = '';
+      if (AV.voice !== 'none') {
+        msg(tt('آواز بنا رہا ہوں…', 'Making the voice-over…'), .6);
+        try { await TP.makeVoices(p, AV.voice, { voice: AV.gvoice }, (i, n) => msg(tt('آواز بن رہی ہے ', 'Voice ') + i + '/' + n, .6 + .3 * i / Math.max(1, n)), ac.signal); }
+        catch (e) { if (ac.signal.aborted) return; p.voice = []; note += AI.errText(e) + ' · ' + tt('بغیر آواز', 'no voice') + '. '; }
+      }
+      if (p.music.kind === 'synth') { msg(tt('موسیقی بنا رہا ہوں…', 'Composing the music…'), .94); try { await S.music.get(p.music.mood, 1); } catch (e) { p.music.kind = 'none'; } }
+      if (ac.signal.aborted) return; dlg.remove(); P.layout(p); AV.media = []; app.go('editor', { p, fresh: true, note });
+    } catch (e) { dlg.remove(); if (!ac.signal.aborted) S.toast(AI.errText(e), undefined, 6000); }
   }
 
   /* ============ WIZARD ============ */

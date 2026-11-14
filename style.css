@@ -137,3 +137,5 @@ textarea:focus, .inp:focus { border-color: var(--acc); }
 .tpls { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
 .big.alt2 { background: linear-gradient(135deg, #ff6a3d, #ff3d8b); box-shadow: 0 10px 30px rgba(255, 90, 90, .3); }
 .big2 { width: 100%; margin-top: 14px; padding: 16px; font-size: 18px; }
+.big.alt3 { background: linear-gradient(135deg, #7c4dff, #00c2ff); box-shadow: 0 10px 30px rgba(80, 120, 255, .3); }
+.card.warn { border-color: #ffb347; }

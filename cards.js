@@ -86,7 +86,7 @@
       const st = .9 + i * .55, ee = E(u, st); if (ee <= 0) return; const y = y0 + i * (bh + H * .018) + bh / 2, w = col * .78;
       c.save(); c.globalAlpha = ee; c.translate((i % 2 ? 1 : -1) * (1 - ee) * 60, 0); rr(c, cx - w / 2, y - bh / 2, w, bh, bh * .28); c.fillStyle = 'rgba(255,255,255,.07)'; c.fill(); c.lineWidth = 1.5; c.strokeStyle = 'rgba(255,255,255,.28)'; c.stroke();
       const fs = T(c, s.toUpperCase(), cx, y, Math.min(B * .06, bh * .5), { color: '#cfc8ff', sp: 2, w: 800, maxW: w * .86 });
-      const sp = cl((u - st - .5) / .4); if (sp > 0) { c.font = '800 ' + fs + 'px ' + fontOf(s); const tw = Math.min(w * .86, c.measureText(s.toUpperCase()).width + 30); c.strokeStyle = t0.a1; c.lineWidth = Math.max(3, B * .008); c.shadowColor = t0.a1; c.shadowBlur = 10; c.beginPath(); c.moveTo(cx - tw / 2, y); c.lineTo(cx - tw / 2 + tw * eo(sp), y); c.stroke(); }
+      const sp = cl((u - st - .5) / .4); if (sp > 0) { c.font = '800 ' + fs + 'px ' + fontOf(s); const tw = Math.min(w * .86, c.measureText(s.toUpperCase()).width + 30); c.strokeStyle = t0.a1; c.lineWidth = Math.max(3, B * .008); c.shadowColor = t0.a1; c.shadowBlur = 10; const ly = y + bh * .3; c.beginPath(); c.moveTo(cx - tw / 2, ly); c.lineTo(cx - tw / 2 + tw * eo(sp), ly); c.stroke(); }
       c.restore(); endT = st + .9;
     });
     const ey = y0 + items.length * (bh + H * .018) + B * .12; e = ob(cl((u - endT) / .5)); if (e > 0 && d.emoji) { c.save(); c.translate(cx, ey); c.scale(e, e); c.font = B * .17 + 'px "Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(d.emoji, 0, 0); c.restore(); }

@@ -120,6 +120,45 @@
     const stopped = new Promise(res => { rec.onstop = res; }); rec.start();
     return { stop: async () => { rec.stop(); await stopped; stream.getTracks().forEach(t => t.stop()); const blob = new Blob(ch, { type: rec.mimeType || 'audio/webm' }); const ab = await blob.arrayBuffer(); const buf = await new Promise((res, rej) => new OfflineAudioContext(1, 1, 44100).decodeAudioData(ab, res, rej)); return { buf, blob: P.bufToWav(buf) }; } };
   };
+
+  /* =============== prompt -> whole promo video plan =============== */
+  const SCHEMA = {
+    hook: 'kicker, title, sub, items(multi-line, 2-4 short lines), emoji(1 emoji), cta',
+    title: 'badge, l1, l2(coloured main words), l3, tag',
+    stats: 'title, chips(lines "BIG | small", 2-6), foot',
+    list: 'title, items(lines, 3-8), numbered("1" or "0")',
+    details: 'title, rows(lines "emoji LABEL | value | optional sub", 2-5), big(short pill), foot',
+    quote: 'text, author',
+    fact: 'kicker, big(a number/word as given), text',
+    timeline: 'title, events(lines "year | what", 3-6)',
+    headline: 'tag, headline, sub, source, ticker, tickerLabel',
+    countdown: 'title, date(YYYY-MM-DD), datetext, label',
+    issue: 'title, rows(lines "LABEL | text", 2-5)',
+    appeal: 'title, goal(number), raised(number), unit, howtitle, how(lines), note',
+    cta: 'title, rows(lines "emoji | text", 1-4), handle, note',
+    testimonial: 'text, name, role, stars',
+    place: 'title, name, address, hint',
+    product: 'badge, name, price, old, features(lines)',
+    offer: 'kicker, big, sub, code, till',
+    invite: 'kicker, name1, name2, date, time, venue, note',
+    outro: 'name, tag, handle',
+    table: 'title, rows(lines "name | value", 2-10), foot',
+    text: 'title, sub'
+  };
+  AI.makeVideo = async function (o, signal) {
+    const lang = o.lang === 'en' ? 'English' : o.lang === 'roman' ? 'Roman Urdu (Urdu written in Latin letters)' : 'Urdu written in Urdu script';
+    const types = Object.keys(SCHEMA).map(k => '- ' + k + ': ' + SCHEMA[k]).join('\n');
+    const n = o.size === 'short' ? '4 to 5' : o.size === 'long' ? '7 to 9' : '5 to 7';
+    const p = 'You design a short vertical promo / event / social / awareness video as a sequence of designed scenes. The user request is between the markers.\n<<<REQUEST\n' + o.prompt + '\nREQUEST>>>\n\n' +
+      'Write all on-screen text in ' + lang + '. Use ONLY facts, names, dates, places, phone numbers and figures that appear in the request. If a detail is missing, leave that field or row out (empty string) - never invent numbers, statistics, prices, phone numbers or names. General wording (hooks, calls to action) is fine.\n' +
+      'Choose ' + n + ' scenes in a good story order (usually: hook or title first, then content scenes, then a cta or details scene, and outro last). Available scene types and their fields:\n' + types + '\n' +
+      'Multi-line fields use \\n between lines. Keep every text short (titles under 6 words, list lines under 8 words). Each scene may also have "say": one natural sentence a narrator reads for that scene (in the same language).\n' +
+      'Also pick "theme" from: neon, social, gold, green, news, promo, sunset, rose, ocean (green for religious, gold or rose for weddings, news for issues and awareness, promo for sales, neon or social for workshops and social media), and "mood" from: calm, happy, travel, emotional, islamic, epic, party. Give a short "name" for the project and "org" (the organisation or person name if stated, else "").\n' +
+      'Return JSON only: {"name":"","org":"","theme":"","mood":"","ticker":"","scenes":[{"type":"","data":{},"say":""}]} where ticker is a news-ticker sentence only for news-style videos, else "".';
+    const j = await gen({ contents: [{ parts: [{ text: p }] }], generationConfig: { responseMimeType: 'application/json', temperature: .7 } }, AI.models(), signal);
+    const r = parseJson(textOf(j)); if (!r || !Array.isArray(r.scenes) || !r.scenes.length) throw err('parse'); return r;
+  };
+
   AI.errText = function (e) {
     const k = e && e.kind;
     if (k === 'key') return S.tt('AI کی (key) درست نہیں یا اس کی اجازت نہیں', 'The AI key is not valid or not allowed');
