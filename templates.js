@@ -11,6 +11,7 @@
     title: [b('عنوان', 'Title'), b('پروگرام / موضوع کا نام', 'Name of the event / topic')], sub: [b('ذیلی لائن / بات', 'Sub line / message'), b('ایک مختصر جملہ', 'One short sentence')],
     date: [b('تاریخ', 'Date'), ''], place: [b('مقام', 'Venue'), b('جگہ کا نام اور شہر', 'Venue name and city')], contact: [b('رابطہ / ہینڈل', 'Contact / handle'), b('فون یا @ہینڈل', 'Phone or @handle')],
     org: [b('ادارے / آپ کا نام', 'Your name / organisation'), ''], points: [b('نکات (ہر لائن الگ)', 'Points (one per line)'), ''], big: [b('بڑا نمبر / لفظ', 'Big number / word'), b('جیسے 70% یا 50% OFF', 'e.g. 70% or 50% OFF')],
+    done: [b('مکمل منصوبے (ہر لائن الگ)', 'Completed projects (one per line)'), ''], going: [b('جاری منصوبے (ہر لائن الگ)', 'Ongoing projects (one per line)'), ''], next: [b('آنے والے منصوبے (ہر لائن الگ)', 'Upcoming projects (one per line)'), ''], figs: [b('اعداد: بڑا | چھوٹا (ہر لائن)', 'Key figures: BIG | small (one per line)'), b('جیسے 12 | منصوبے', 'e.g. 12 | PROJECTS')],
     price: [b('قیمت', 'Price'), ''], goal: [b('ہدف رقم', 'Goal amount'), ''], raised: [b('اب تک جمع', 'Raised so far'), ''], person: [b('مقرر / مہمان کا نام (نام پٹی)', 'Speaker / guest name (name tag)'), ''], role: [b('اس کا عہدہ', 'Their role'), '']
   };
 
@@ -43,6 +44,11 @@
   add('social', 'meet', '🙋', b('تعارف / میں کون ہوں', 'Meet the creator'), 'social', 'happy', ['title', 'sub', 'points', 'org', 'contact', 'person', 'role'],
     { title: b('میرا نام', 'MY NAME'), sub: b('میں کیا کرتا ہوں', 'What I do'), points: b('100K | فالوورز\n5 | سال\n200 | ویڈیوز', '100K | FOLLOWERS\n5 | YEARS\n200 | VIDEOS'), org: b('آپ کا نام', 'Your Name'), contact: b('@آپ_کا_نام', '@yourname') },
     [['title', { badge: b('ملیں', 'MEET'), l1: '', l2: '{title}', l3: '{sub}', tag: '{contact}' }, 4], ['stats', { title: b('ایک نظر میں', 'AT A GLANCE'), chips: '{points}', foot: '' }, 5], ['outro', { name: '{org}', handle: '{contact}' }, 3.4]], { lower: true });
+
+  /* ---------------- local bodies development update ---------------- */
+  add('issue', 'devwork', '🏗️', b('بلدیاتی ترقیاتی کام کی اپڈیٹ', 'Local bodies development update'), 'ocean', 'epic', ['title', 'sub', 'figs', 'done', 'going', 'next', 'person', 'role', 'contact', 'org'],
+    { title: b('ترقیاتی کاموں کی اپڈیٹ', 'DEVELOPMENT WORK UPDATE'), sub: b('عوام کی خدمت، مستقبل کی تعمیر', 'Serving the Community. Building the Future.'), figs: b('12 | منصوبے\n8 | مکمل\n4 | جاری', '12 | PROJECTS\n8 | COMPLETED\n4 | ONGOING'), done: b('گلی کی پختگی\nنکاسی آب کی لائن\nپارک کی بحالی', 'Street paving\nSewerage line\nPark renovation'), going: b('سڑک کی تعمیر\nواٹر سپلائی لائن', 'Road construction\nWater supply line'), next: b('اسکول کی مرمت\nاسٹریٹ لائٹس', 'School repair\nStreet lights'), person: b('چیئرمین / ناظم کا نام', 'Chairman / Nazim Name'), role: b('ٹاؤن / یونین کونسل', 'Town / Union Council'), contact: b('0300-0000000', '0300-0000000'), org: b('ٹاؤن / یونین کونسل', 'Town / Union Council') },
+    [['title', { badge: b('اپڈیٹ', 'UPDATE'), l1: '', l2: '{title}', l3: '', tag: '{sub}' }, 4.2], ['stats', { title: b('ایک نظر میں', 'AT A GLANCE'), chips: '{figs}', foot: '{org}' }, 5], ['list', { title: b('✅ مکمل منصوبے', 'COMPLETED PROJECTS'), items: '{done}', numbered: '0' }, 6.4], ['list', { title: b('🚧 جاری کام', 'WORK IN PROGRESS'), items: '{going}', numbered: '0' }, 5.6], ['list', { title: b('🗓️ آنے والے منصوبے', 'COMING NEXT'), items: '{next}', numbered: '0' }, 5.6], ['cta', { title: b('شکایت یا تجویز', 'FEEDBACK / COMPLAINTS'), rows: '📞 | {contact}', handle: '{person}', note: '{sub}' }, 4.6], ['outro', { name: '{org}', handle: '{contact}', tag: '{sub}' }, 3.4]], { media: 'event', mediaAt: 2, lower: true, chip: b('کام کی جھلک', 'ON SITE') });
 
   /* ---------------- issue ---------------- */
   add('issue', 'breaking', '🚨', b('بریکنگ نیوز انداز', 'Breaking-news style'), 'news', 'epic', ['title', 'sub', 'org', 'points', 'contact'],
