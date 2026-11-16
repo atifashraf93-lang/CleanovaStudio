@@ -105,7 +105,7 @@
   }
   async function addTplMedia(files) {
     files = Array.from(files || []); if (!files.length) return; MS.loading += files.length; paintTM();
-    for (const f of files) { try { const c = await A.loadFile(f, false); c.adj = A.adjFor(c); MS.media.push(c); } catch (e) { S.toast('فائل نہیں کھلی', 'Could not open a file'); } MS.loading--; paintTM(); }
+    for (const f of files) { try { const c = await A.loadFile(f, MS === AV); c.adj = A.adjFor(c); MS.media.push(c); } catch (e) { S.toast('فائل نہیں کھلی', 'Could not open a file'); } MS.loading--; paintTM(); }
   }
   function paintTM() {
     const box = $('#tm'); if (!box) return;
@@ -210,17 +210,27 @@
     const msg = (m, q) => { const e = $('#pm'); if (e) e.textContent = m; if (q !== undefined && $('#pb')) $('#pb').style.width = Math.round(q * 100) + '%'; };
     $('#pc').onclick = () => { ac.abort(); dlg.remove(); };
     try {
-      msg(tt('AI آپ کی بات سمجھ کر سین بنا رہا ہے…', 'The AI is planning your scenes…'), .15);
-      const r = await AI.makeVideo({ prompt: AV.prompt.trim(), lang: AV.lang, size: AV.size }, ac.signal); if (ac.signal.aborted) return;
-      msg(tt('ڈیزائن بنا رہا ہوں…', 'Designing…'), .5); await S.sleep(30);
-      const p = TP.buildAI(r, { prompt: AV.prompt, fmt: AV.fmt, res: AV.res, music: AV.music, musicFile: AV.musicFile, media: AV.media.slice(), credit: AV.credit, brandOn: AV.brandOn }); let note = '';
+      let p, note = '';
+      if (AV.media.length) {
+        msg(tt('AI آپ کی تصاویر اور ویڈیوز دیکھ رہا ہے…', 'The AI is looking at your photos and videos…'), .12);
+        const target = TP.targetSeconds(AV.prompt, AV.size);
+        const r = await AI.direct({ prompt: AV.prompt.trim(), lang: AV.lang, target, clips: AV.media.slice() }, ac.signal); if (ac.signal.aborted) return;
+        msg(tt('ٹائم لائن بنا رہا ہوں…', 'Building the timeline…'), .5); await S.sleep(30);
+        p = TP.buildDirector(r, { prompt: AV.prompt, target, fmt: AV.fmt, res: AV.res, music: AV.music, musicFile: AV.musicFile, media: AV.media.slice(), credit: AV.credit, brandOn: AV.brandOn });
+      } else {
+        msg(tt('AI آپ کی بات سمجھ کر سین بنا رہا ہے…', 'The AI is planning your scenes…'), .15);
+        const r = await AI.makeVideo({ prompt: AV.prompt.trim(), lang: AV.lang, size: AV.size }, ac.signal); if (ac.signal.aborted) return;
+        msg(tt('ڈیزائن بنا رہا ہوں…', 'Designing…'), .5); await S.sleep(30);
+        p = TP.buildAI(r, { prompt: AV.prompt, fmt: AV.fmt, res: AV.res, music: AV.music, musicFile: AV.musicFile, media: [], credit: AV.credit, brandOn: AV.brandOn });
+      }
       if (AV.voice !== 'none') {
         msg(tt('آواز بنا رہا ہوں…', 'Making the voice-over…'), .6);
         try { await TP.makeVoices(p, AV.voice, { voice: AV.gvoice }, (i, n) => msg(tt('آواز بن رہی ہے ', 'Voice ') + i + '/' + n, .6 + .3 * i / Math.max(1, n)), ac.signal); }
         catch (e) { if (ac.signal.aborted) return; p.voice = []; note += AI.errText(e) + ' · ' + tt('بغیر آواز', 'no voice') + '. '; }
       }
       if (p.music.kind === 'synth') { msg(tt('موسیقی بنا رہا ہوں…', 'Composing the music…'), .94); try { await S.music.get(p.music.mood, 1); } catch (e) { p.music.kind = 'none'; } }
-      if (ac.signal.aborted) return; dlg.remove(); P.layout(p); AV.media = []; app.go('editor', { p, fresh: true, note });
+      if (ac.signal.aborted) return; dlg.remove(); P.layout(p); AV.media = []; const rpt = p.report; delete p.report; app.go('editor', { p, fresh: true, note });
+      if (rpt && rpt.length) S.dialog({ title: '🎬 ' + tt('AI ڈائریکٹر نے یہ کیا', 'What the AI director did'), text: rpt.join('\n') + '\n\n' + tt('ایڈیٹر میں ہر چیز بدل سکتے ہیں۔', 'You can change everything in the editor.') });
     } catch (e) { dlg.remove(); if (!ac.signal.aborted) S.dialog({ title: '⚠️ ' + tt('ویڈیو نہیں بن سکی', 'Could not create the video'), text: AI.errText(e) + (e && e.message && e.message !== e.kind ? '\n\n(' + String(e.message).slice(0, 160) + ')' : '') }); }
   }
 

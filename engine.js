@@ -29,7 +29,7 @@
   P.newSticker = function (o) {
     return Object.assign({ id: S.uid(), ref: 'e:✨', x: .5, y: .5, size: 18, rot: 0, anim: 'pop', clip: null, t0: 0, t1: 3, all: false, x1: null, y1: null }, o || {});
   };
-  const RT = ['an', 'file', 'url', 'el', 'bmp', 'thumb', 'frames', 'node', 'gain', 'buf', 'blob', '_musBuf', '_bmpLoading', '_pre', '_seeking', 'cfiles', 'cbmp', '_cLoading'];
+  const RT = ['an', 'file', 'url', 'el', 'bmp', 'thumb', 'frames', 'node', 'gain', 'buf', 'blob', '_musBuf', '_bmpLoading', '_pre', '_seeking', 'cfiles', 'cbmp', '_cLoading', 'frameT'];
   P.serialize = function (p) {
     return JSON.stringify(p, (k, v) => (RT.indexOf(k) >= 0 || (k[0] === '_' && k !== '_x') ? undefined : v));
   };

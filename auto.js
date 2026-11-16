@@ -61,13 +61,13 @@
       const v = document.createElement('video'); v.muted = true; v.preload = 'auto'; v.playsInline = true; v.src = c.url;
       const ok = await waitEv(v, 'loadedmetadata', 8000); if (!ok || !v.videoWidth) { URL.revokeObjectURL(c.url); throw new Error('video'); }
       c.sw = v.videoWidth; c.sh = v.videoHeight; c.dur = isFinite(v.duration) ? v.duration : 5; c.in = 0; c.out = c.dur;
-      const n = cl(Math.ceil(c.dur / 2), 3, 8), ts = [], qs = [], lumas = []; const keep = wantFrames ? [0, Math.floor(n / 2), n - 1] : []; c.frames = [];
+      const n = cl(Math.ceil(c.dur / 2), 3, 8), ts = [], qs = [], lumas = []; const keep = wantFrames ? [0, Math.floor(n / 2), n - 1] : []; c.frames = []; c.frameT = [];
       for (let i = 0; i < n; i++) {
         const tt = Math.min(c.dur - .05, Math.max(0, (i + .5) * c.dur / n)); ts.push(tt);
         v.currentTime = tt; await waitEv(v, 'seeked', 2500);
         try { ax.drawImage(v, 0, 0, SZ, SZ); const st = stats(ax, SZ, SZ); qs.push(st.q); lumas.push(st.luma); } catch (e) { qs.push(.5); lumas.push(.5); }
         if (i === Math.min(1, n - 1)) { const t = jpeg(v, c.sw, c.sh, 220); c.thumb = t.c; }
-        if (keep.indexOf(i) >= 0) c.frames.push(jpeg(v, c.sw, c.sh, 320).url);
+        if (keep.indexOf(i) >= 0) { c.frames.push(jpeg(v, c.sw, c.sh, 320).url); c.frameT.push(tt); }
       }
       v.removeAttribute('src'); v.load();
       c.an = { ts, qs, lumas }; c.score = qs.reduce((a, b) => a + b, 0) / qs.length;

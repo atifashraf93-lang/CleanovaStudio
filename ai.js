@@ -172,6 +172,37 @@
     throw lastE || err('parse');
   };
 
+
+  /* =============== AI Director: reads the direction, looks at the clips, plans the whole timeline =============== */
+  AI.direct = async function (o, signal) {
+    const clips = o.clips.slice(0, 24), lang = o.lang === 'en' ? 'English' : o.lang === 'roman' ? 'Roman Urdu (Urdu in Latin letters)' : 'Urdu written in Urdu script';
+    const types = Object.keys(SCHEMA).map(k => '- ' + k + ': ' + SCHEMA[k]).join('\n');
+    const mots = ['kenburns', 'slowzoom', 'pulse', 'sway', 'none'];
+    const head = 'You are the AI director of a video editor app. The user gave a written direction for a video and uploaded ' + clips.length + ' clips (photos and videos). Below the direction you will see each clip as 1 to 3 small frames in time order. Plan the complete timeline.\n' +
+      'DIRECTION (follow it literally and in the order given):\n<<<DIRECTION\n' + o.prompt + '\nDIRECTION>>>\n\n' +
+      'RULES\n1. Every piece of on-screen text that the direction puts in quotation marks must appear VERBATIM (same words) somewhere, in the order of the direction. Opening texts first, closing texts last.\n' +
+      '2. Use EVERY clip at least once. Match clips to the topics of the direction by what you actually SEE (trainer speaking, participants practising, group, audience, slides, laptops, certificates...). Put the most energetic clips early and the group or wide shots near the end. A long video may appear twice using a different moment. Never invent people, numbers, names or places that are not in the direction.\n' +
+      '3. Timeline items are either designed text scenes {"kind":"card","type":"...","data":{...},"say":""} or media clips {"kind":"clip","i":<clip index>,"moment":<0,1 or 2 = which of its frames shows the best moment (videos only)>,"len":<seconds 2 to 5>,"motion":"' + mots.join('|') + '","fx":"none|slow|punch","caption":{"text":"","pos":"bottom|center|top"}}. A caption is a short overlay line on that clip (for example one of the quotes, or a topic name). Not every clip needs a caption; avoid more than one caption in a row of three clips.\n' +
+      '4. Use "slow" for emotional or key moments, "punch" for energetic ones, and keep most clips "none". Use motion "kenburns" or "slowzoom" on photos and "none" on most videos.\n' +
+      '5. Text scenes use these types and fields (multi-line fields use \\n between lines; keep texts short):\n' + types + '\n' +
+      '6. "media_style": "full" if the direction is a recap, aftermovie, reel, memories or highlight video (clips fill the screen and text overlays them), otherwise "frame" (clips sit inside a neon frame).\n' +
+      '7. All text you write yourself must be in ' + lang + '; quoted texts stay exactly as given. Pick "theme" from: neon, social, gold, green, news, promo, sunset, rose, ocean and "mood" from: calm, happy, travel, emotional, islamic, epic, party.\n' +
+      '8. "checklist": one entry per instruction in the direction, {"req":"short name of the instruction","how":"where/how you applied it, or why it cannot be done by this app"}. Be honest: this app cannot do real speed ramping, face-expression detection or camera moves beyond zoom/pan.\n' +
+      'Target length: about ' + (o.target || 45) + ' seconds in total.\n' +
+      'Return JSON only: {"name":"","org":"","theme":"","mood":"","media_style":"full","ticker":"","timeline":[...],"checklist":[{"req":"","how":""}]}';
+    const parts = [{ text: head }];
+    clips.forEach((c, i) => { parts.push({ text: 'Clip ' + i + (c.kind === 'v' ? ' (video ' + Math.round(c.dur) + 's, frames 0..' + Math.max(0, (c.frames || []).length - 1) + ')' : ' (photo)') + ':' }); (c.frames || []).forEach(f => parts.push({ inline_data: { mime_type: 'image/jpeg', data: f.split(',')[1] } })); });
+    const ms = AI.models().slice().sort((a, b) => (/lite/.test(b) ? 1 : 0) - (/lite/.test(a) ? 1 : 0)); let lastE = null;
+    /* a thinking model on many images is slow; try a lighter one first, then the stronger ones */
+    for (let i = 0; i < Math.min(3, ms.length); i++) {
+      try {
+        const j = await gen({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json', temperature: .6, maxOutputTokens: 12000 } }, ms.slice(i), signal);
+        const r = parseJson(textOf(j)); if (!r || !Array.isArray(r.timeline) || !r.timeline.length) throw err('parse', 'no timeline in the answer'); return r;
+      } catch (e) { lastE = e; if (e.kind !== 'parse') throw e; }
+    }
+    throw lastE || err('parse');
+  };
+
   AI.errText = function (e) {
     const k = e && e.kind;
     if (k === 'key') return S.tt('AI کی (key) درست نہیں یا اس کی اجازت نہیں', 'The AI key is not valid or not allowed');

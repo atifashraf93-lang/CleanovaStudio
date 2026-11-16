@@ -201,6 +201,71 @@
     p.music = m === 'none' ? { kind: 'none' } : m === 'file' && o.musicFile ? { kind: 'file', file: o.musicFile, mood: 'calm', vol: .5, start: 0, duck: true } : { kind: 'synth', mood: m === 'auto' ? (moods.indexOf(r.mood) >= 0 ? r.mood : 'happy') : m, seed: 1, vol: .5, start: 0, duck: true };
     P.layout(p); p.clips.forEach(c => { if (c.kind === 'c') c.thumb = C.thumb(c, p, { logo: p.brand.logo }); }); return p;
   };
+
+  /* ---------------- AI Director: build the timeline from the plan ---------------- */
+  const norm = t => String(t || '').toLowerCase().replace(/[\u{1F000}-\u{1FFFF}☀-➿️]/gu, '').replace(/[^\p{L}\p{N}]+/gu, '');
+  TP.quotesOf = txt => { const out = [], re = /[“"«]([^”"»\n]{6,140})[”"»]/g; let m; while ((m = re.exec(txt))) out.push(m[1].trim()); return out; };
+  TP.targetSeconds = (txt, size) => { const m = /(\d{2,3})\s*(?:[-–to]+\s*(\d{2,3}))?\s*(?:seconds|second|secs|sec|سیکنڈ|s\b)/i.exec(txt); if (m) { const a = +m[1], b = m[2] ? +m[2] : a; return Math.max(15, Math.min(120, Math.round((a + b) / 2))); } return size === 'short' ? 30 : size === 'long' ? 75 : 50; };
+  function cloneClip(c) {
+    const d = JSON.parse(JSON.stringify(c, (k, v) => (['file', 'url', 'el', 'bmp', 'thumb', 'frames', 'frameT', 'an', 'cfiles', 'cbmp', 'node', 'gain'].indexOf(k) >= 0 ? undefined : v)));
+    return Object.assign(d, { id: S.uid(), file: c.file, url: c.url, thumb: c.thumb, an: c.an, frames: c.frames, frameT: c.frameT });
+  }
+  TP.buildDirector = function (r, o) {
+    o = o || {}; const media = (o.media || []).slice(0, 24), CX = C.THEMES;
+    const p = P.newProject(); p.fmt = o.fmt || '9:16'; p.res = o.res || 720; p.credit = o.credit !== false; p.fit = 'blur'; p.autoColor = true; p.style = 'cinema'; p.kind = 'promo'; p.tpl = 'director';
+    p.theme = CX[r.theme] ? r.theme : 'neon'; p.name = String(r.name || 'Video').slice(0, 40);
+    const br = Object.assign(TP.brand(), o.brand || {}), org = String(r.org || '').trim() || br.name || '';
+    p.brand = { on: o.brandOn !== false && !!(br.logo || br.header || br.footer || (org && r.media_style === 'frame')), name: org, header: br.header || '', footer: br.footer || org, logo: br.logo || '' };
+    const moods = ['calm', 'happy', 'travel', 'emotional', 'islamic', 'epic', 'party']; const m = o.music || 'auto';
+    p.music = m === 'none' ? { kind: 'none' } : m === 'file' && o.musicFile ? { kind: 'file', file: o.musicFile, mood: 'calm', vol: .5, start: 0, duck: true } : { kind: 'synth', mood: m === 'auto' ? (moods.indexOf(r.mood) >= 0 ? r.mood : 'epic') : m, seed: 1, vol: .5, start: 0, duck: true };
+    const beat = p.music.kind === 'synth' ? 60 / S.music.bpm(p.music.mood) : 0, full = r.media_style !== 'frame';
+    const TRS2 = full ? ['fade', 'dissolve', 'slideL', 'zoomIn', 'fade', 'pushL'] : ['fade', 'slideL', 'zoomIn', 'dissolve', 'wipeL', 'pushL']; let ti = 0;
+    const used = {}, items = [], texts = [], allText = []; const MOT = { kenburns: 'kenburns', slowzoom: 'slowzoom', pulse: 'pulse', sway: 'sway' };
+    const mkCard = sc => {
+      const type = String(sc.type || ''); if (!C.TYPES[type]) return null; const ok = {}; C.fields(type).forEach(f => { ok[f.k] = 1; }); const ov = {};
+      Object.keys(sc.data || {}).forEach(k => { if (ok[k] && sc.data[k] != null) ov[k] = String(sc.data[k]).replace(/\\n/g, '\n'); });
+      const c = P.newCard(type, ov); Object.keys(ok).forEach(k => { if (ov[k] === undefined && !/^img/.test(k)) c.card.data[k] = ''; });
+      if (type === 'countdown' && !/^\d{4}-\d{2}-\d{2}$/.test(ov.date || '')) c.card.data.date = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+      if (type === 'list' && !c.card.data.numbered) c.card.data.numbered = '1';
+      c.card.data.say = String(sc.say || '').trim(); const tl = Object.values(c.card.data).join(' ').length; c.len = Math.max(3, Math.min(7, c.len * .6 + tl / 70)); allText.push(Object.values(c.card.data).join(' ')); return c;
+    };
+    const mkClip = it => {
+      const i = Math.floor(+it.i), src = media[i]; if (!src) return null; const first = !used[i]; used[i] = 1; const c = first ? src : cloneClip(src);
+      let L = Math.max(1.6, Math.min(6, +it.len || 3)); const fx = it.fx === 'slow' || it.fx === 'punch' ? it.fx : 'none';
+      c.anim = { in: 'none', mid: MOT[it.motion] || (c.kind === 'i' ? 'kenburns' : 'none'), out: 'none' }; c.vfx = fx === 'punch' ? 'punch' : 'none'; c.speed = 1;
+      if (c.kind === 'v') {
+        const ft = (c.frameT && c.frameT.length) ? c.frameT[Math.max(0, Math.min(c.frameT.length - 1, Math.floor(+it.moment) || 0))] : c.dur / 2; const sp = fx === 'slow' ? .6 : 1;
+        L = Math.min(L, c.dur / sp); const span = L * sp; let a = Math.max(0, Math.min(c.dur - span, ft - span / 2)); c.in = a; c.out = Math.min(c.dur, a + span); c.speed = sp; c.mute = p.music.kind !== 'none'; c.len = (c.out - c.in) / sp;
+      } else { c.len = Math.min(L, 4); }
+      c.trans = { type: TRS2[ti++ % TRS2.length], dur: .5 };
+      if (!full) { c.hl = { on: true, chip: '', title: '', num: 0, sub: '', chips: '' }; if (it.chip) c.hl.chip = String(it.chip); if (it.title) c.hl.title = String(it.title); }
+      const cap = it.caption && String(it.caption.text || '').trim(); if (cap) { const pos = it.caption.pos === 'top' ? .2 : it.caption.pos === 'center' ? .5 : .78; texts.push({ clip: c.id, text: cap, y: pos }); allText.push(cap); }
+      return c;
+    };
+    (r.timeline || []).slice(0, 40).forEach(it => { const c = it.kind === 'clip' ? mkClip(it) : mkCard(it); if (c) { if (c.kind === 'c') c.trans = { type: TRS2[ti++ % TRS2.length], dur: .5 }; items.push(c); } });
+    /* coverage: every clip appears at least once */
+    const unused = media.map((c, i) => i).filter(i => !used[i]); const added = unused.length;
+    unused.forEach((i, k) => { const c = mkClip({ i, moment: 1, len: 2.6, motion: 'kenburns' }); const pos = Math.max(1, Math.min(items.length - 1, Math.round((k + 1) * items.length / (unused.length + 1)))); items.splice(pos, 0, c); });
+    /* quoted lines of the direction must be on screen */
+    const need = TP.quotesOf(o.prompt || ''), have = norm(allText.join(' ')), missing = need.filter(q => have.indexOf(norm(q)) < 0);
+    missing.forEach(q => { const c = P.newCard('text', { title: q, sub: '' }, 3.6); c.trans = { type: 'fade', dur: .5 }; items.splice(Math.max(1, items.length - 1), 0, c); allText.push(q); });
+    if (!items.length) throw new Error('no scenes');
+    /* length to target, beat-snapped */
+    const target = +o.target || 50, fixed = items.filter(c => c.kind === 'c').reduce((a, c) => a + c.len, 0), mv = items.filter(c => c.kind !== 'c');
+    const tot = mv.reduce((a, c) => a + c.len, 0), room = Math.max(mv.length * 1.6, target - fixed), k = tot > room ? room / tot : Math.min(1.7, room / Math.max(tot, 1));
+    items.forEach(c => {
+      if (c.kind === 'c') { if (beat) c.len = Math.max(2, Math.round(c.len / beat)) * beat; return; }
+      let v = Math.min(5.5, Math.max(1.4, c.len * k)); if (beat) v = Math.max(2, Math.round(v / beat)) * beat; if (c.kind === 'v') { v = Math.min(v, c.dur / c.speed); c.out = Math.min(c.dur, c.in + v * c.speed); c.len = (c.out - c.in) / c.speed; } else c.len = v;
+    });
+    p.clips = items; p.texts = texts.map(t => P.newText({ clip: t.clip, text: t.text, y: t.y, size: 6.2, bg: 'rgba(0,0,0,.42)', in: 'slideU', out: 'fade' }));
+    if (r.ticker && String(r.ticker).trim()) p.ticker = { on: true, label: S.lang === 'ur' ? 'تازہ' : 'LIVE', text: String(r.ticker).trim() };
+    P.layout(p); p.clips.forEach(c => { if (c.kind === 'c') c.thumb = C.thumb(c, p, { logo: p.brand.logo }); });
+    const rep = []; const nu = Object.keys(used).length;
+    rep.push('✅ ' + (S.lang === 'ur' ? 'تصاویر/ویڈیوز استعمال ہوئیں: ' : 'Clips used: ') + Math.min(media.length, nu + added) + '/' + media.length + (added ? ' (' + (S.lang === 'ur' ? 'باقی خود شامل کیں' : 'the rest were added automatically') + ')' : ''));
+    if (need.length) rep.push((missing.length ? '⚠️' : '✅') + ' ' + (S.lang === 'ur' ? 'آپ کے اقتباس والی لائنیں: ' : 'Your quoted lines on screen: ') + (need.length - missing.length) + '/' + need.length + (missing.length ? ' (' + (S.lang === 'ur' ? 'باقی الگ سین میں ڈالیں' : 'the rest were added as text scenes') + ')' : ''));
+    (r.checklist || []).slice(0, 14).forEach(x => { if (x && x.req) rep.push('• ' + String(x.req).slice(0, 60) + ' → ' + String(x.how || '').slice(0, 110)); });
+    p.report = rep; return p;
+  };
   /* voice-over: reads each card's "say" text (or its headline) */
   TP.cardSay = c => { const d = c.card && c.card.data; if (!d) return ''; if (d.say && d.say.trim()) return d.say.trim(); const k = ['headline', 'title', 'text', 'big', 'name'].find(x => d[x] && String(d[x]).trim()); return k ? String(d[k]).replace(/\s*\n\s*/g, '. ') : ''; };
   TP.makeVoices = async function (p, mode, opt, onProg, signal) {
