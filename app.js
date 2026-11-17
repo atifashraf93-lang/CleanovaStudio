@@ -179,6 +179,7 @@
     root().innerHTML = '<div class="scr">' + top('✨ ' + tt('پرامپٹ سے ویڈیو', 'Video from a prompt'), true, langBox()) + '<div class="body">' +
       (aiOn ? '' : '<div class="card warn"><b>⚠️ ' + tt('AI key ضروری ہے', 'AI key needed') + '</b><div class="mut">' + tt('یہ فیچر انٹرنیٹ اور آپ کی اپنی مفت Gemini key سے چلتا ہے۔ Settings میں key ڈالیں۔', 'This feature needs internet and your own free Gemini key. Add it in Settings.') + '</div><div class="acts"><button id="avset">⚙️ ' + tt('Settings کھولیں', 'Open Settings') + '</button></div></div>') +
       '<div class="card"><h3>1️⃣ ' + tt('کیسی ویڈیو چاہیے؟ لکھیں', 'Describe the video you want') + '</h3><textarea id="avp" rows="6" dir="auto" placeholder="' + esc(tt('مثال: ہماری ورکشاپ 13 نومبر کو شام 6 بجے ابو تراب اسکول میں ہے، مفت ہے، رابطہ 0300-1234567', 'Example: Our workshop is on 13 November at 6 PM at Abu Turab School, it is free, call 0300-1234567')) + '">' + esc(AV.prompt) + '</textarea>' +
+      '<div class="acts"><button id="avmic">🎤 ' + tt('بول کر لکھیں', 'Speak your prompt') + '</button></div>' +
       '<div class="mut">' + tt('جتنی تفصیل (نام، تاریخ، جگہ، فون) دیں گے ویڈیو اتنی درست بنے گی۔ جو نہیں بتائیں گے وہ ایپ خود نہیں گھڑے گی۔', 'The more detail you give (names, date, place, phone) the better. Anything you leave out is not invented.') + '</div>' +
       '<div class="lbl">' + tt('مثالیں (چھو کر بھریں)', 'Examples (tap to fill)') + '</div><div class="chips">' + AV_EX.map((x, i) => '<button class="chip" data-ex="' + i + '">' + x[0] + ' ' + x[S.lang === 'ur' ? 1 : 2] + '</button>').join('') + '</div></div>' +
       '<div class="card"><h3>2️⃣ ' + tt('زبان اور لمبائی', 'Language and length') + '</h3>' + chips([['ur', 'اردو'], ['roman', 'Roman Urdu'], ['en', 'English']], AV.lang, 'lng') + chips([['short', tt('چھوٹی', 'Short')], ['mid', tt('درمیانی', 'Medium')], ['long', tt('لمبی', 'Long')]], AV.size, 'siz') + '</div>' +
@@ -190,6 +191,7 @@
     bindLang(); $('#bk').onclick = () => app.go('home'); paintTM();
     if ($('#avset')) $('#avset').onclick = () => app.go('settings');
     $('#avp').oninput = e => { AV.prompt = e.target.value; };
+    $('#avmic').onclick = speakPrompt;
     $$('[data-ex]').forEach(b => b.onclick = () => { const x = AV_EX[+b.dataset.ex]; AV.prompt = x[S.lang === 'ur' ? 3 : 4]; AV.lang = S.lang === 'ur' ? 'ur' : 'en'; SCR.aivid(); });
     $$('[data-lng]').forEach(b => b.onclick = () => { AV.lang = b.dataset.lng; SCR.aivid(); }); $$('[data-siz]').forEach(b => b.onclick = () => { AV.size = b.dataset.siz; SCR.aivid(); });
     $('#tfm').onchange = e => { addTplMedia(e.target.files); e.target.value = ''; };
@@ -200,6 +202,18 @@
     $('#tbr').onchange = e => { AV.brandOn = e.target.checked; };
     $('#avgo').onclick = makeFromPrompt;
   };
+  async function speakPrompt() {
+    if (!AI.enabled()) { S.toast('پہلے Settings میں AI key ڈالیں', 'Add the AI key in Settings first', 4000); return; }
+    let rec; try { rec = await AI.recordVoice(); } catch (e) { S.toast('مائیک کی اجازت نہیں ملی', 'Microphone permission was not given', 4500); return; }
+    const t0 = Date.now(); let iv;
+    const go = await S.dialog({ onOpen: () => { iv = setInterval(() => { const s = Math.floor((Date.now() - t0) / 1000), el = $('#rct'); if (el) el.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); if (s >= 150) { const b = $('.dlg .dbtn button'); if (b) b.click(); } }, 300); },
+      title: '🎤 ' + tt('بولیں، ویڈیو کی تفصیل بتائیں', 'Speak: describe your video'), html: '<div style="text-align:center;font-size:30px" id="rct">0:00</div><div class="mut" style="text-align:center">' + tt('اردو یا انگلش میں بولیں: کیا ویڈیو چاہیے، نام، تاریخ، جگہ، متن۔ ختم ہو تو "بس" دبائیں۔', 'Speak in Urdu or English: what video, names, date, place, texts. Press Done when finished.') + '</div>', buttons: [[tt('⏹ بس', '⏹ Done'), true], [tt('منسوخ', 'Cancel'), false, 'sec']], cancel: false });
+    clearInterval(iv); let res; try { res = await rec.stop(); } catch (e) { S.toast('ریکارڈنگ نہیں ہو سکی', 'Recording failed'); return; }
+    if (!go || res.buf.duration < 1) return;
+    const dlg = document.createElement('div'); dlg.className = 'dlg'; dlg.innerHTML = '<div class="dbox"><h3>🎤 ' + tt('آپ کی بات لکھ رہا ہوں…', 'Writing down what you said…') + '</h3><div class="bar"><i style="width:60%"></i></div></div>'; document.body.appendChild(dlg);
+    try { const t = await AI.transcribe(res.blob); AV.prompt = (AV.prompt.trim() ? AV.prompt.trim() + '\n' : '') + t; S.stat('voice_prompt'); dlg.remove(); SCR.aivid(); S.toast('✅ لکھ دیا، چاہیں تو درست کریں', '✅ Done, you can edit the text', 3500); }
+    catch (e) { dlg.remove(); S.dialog({ title: '⚠️ ' + tt('آواز لکھی نہیں جا سکی', 'Could not write the speech'), text: AI.errText(e) }); }
+  }
   async function makeFromPrompt() {
     if (AV.loading) { S.toast('تصاویر ابھی لوڈ ہو رہی ہیں', 'Media is still loading'); return; }
     if (AV.prompt.trim().length < 8) { S.toast('پہلے ویڈیو کے بارے میں لکھیں', 'Write what the video is about first'); return; }

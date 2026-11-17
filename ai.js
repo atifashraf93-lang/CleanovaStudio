@@ -128,6 +128,15 @@
     return { stop: async () => { rec.stop(); await stopped; stream.getTracks().forEach(t => t.stop()); const blob = new Blob(ch, { type: rec.mimeType || 'audio/webm' }); const ab = await blob.arrayBuffer(); const buf = await new Promise((res, rej) => new OfflineAudioContext(1, 1, 44100).decodeAudioData(ab, res, rej)); return { buf, blob: P.bufToWav(buf) }; } };
   };
 
+
+  /* speech -> text with Gemini (works for Urdu, English and mixed speech) */
+  AI.transcribe = async function (wav, signal) {
+    const b64 = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1]); fr.onerror = rej; fr.readAsDataURL(wav); });
+    const p = 'Transcribe this audio exactly as spoken. It may be Urdu, English or a mix. Write Urdu words in Urdu script and English words in English letters. Keep names, numbers, dates and phone numbers exactly as said (digits for numbers). Do not translate, summarise or add anything. Return only the transcript text.';
+    const j = await gen({ contents: [{ parts: [{ text: p }, { inline_data: { mime_type: 'audio/wav', data: b64 } }] }], generationConfig: { temperature: 0 } }, AI.models().slice().sort((a, b) => (/lite/.test(b) ? 1 : 0) - (/lite/.test(a) ? 1 : 0)), signal);
+    const t = textOf(j).trim(); if (!t) throw err('parse', 'empty transcript'); return t;
+  };
+
   /* =============== prompt -> whole promo video plan =============== */
   const SCHEMA = {
     hook: 'kicker, title, sub, items(multi-line, 2-4 short lines), emoji(1 emoji), cta',
