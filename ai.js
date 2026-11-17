@@ -161,6 +161,8 @@
     table: 'title, rows(lines "name | value", 2-10), foot',
     text: 'title, sub'
   };
+const LOOKS = 'cinematic: slow elegant premium aftermovie | energetic: fast cuts, glitch/flash, bold bouncing captions, TikTok-style | elegant: romantic golden, slow dissolves, serif captions (weddings, invitations) | news: serious, wipes, ticker (awareness, issues, updates) | corporate: clean professional slides | islamic: calm green/gold, soft fades, stars (religious events) | party: colourful confetti, quick flashy (birthdays, celebrations) | documentary: slow, film grain, muted | vlog: warm lively travel style | nostalgic: vintage film, sepia, memories | hype: aggressive sports/high energy | minimal: quiet simple';
+  const FXLISTS = 'filters: none, warm, cool, vintage, bw, cinematic, vivid, soft, sepia, fade, dramatic, golden, rose, mint. overlays: none, confetti, stars, hearts, petals, rain, snow, sparks, bokeh, lightleak, grain, vignette, vhs, film. transitions: fade, dissolve, slideL, slideR, slideU, pushL, pushR, wipeL, wipeR, zoomIn, zoomOut, spin, flip, cube, circleOpen, blinds, glitch, flash, blur, dipBlack, dipWhite, diagWipe, checker, splitH, heart';
   AI.makeVideo = async function (o, signal) {
     const lang = o.lang === 'en' ? 'English' : o.lang === 'roman' ? 'Roman Urdu (Urdu written in Latin letters)' : 'Urdu written in Urdu script';
     const types = Object.keys(SCHEMA).map(k => '- ' + k + ': ' + SCHEMA[k]).join('\n');
@@ -169,12 +171,12 @@
       'Write all on-screen text in ' + lang + '. Use ONLY facts, names, dates, places, phone numbers and figures that appear in the request. If a detail is missing, leave that field or row out (empty string) - never invent numbers, statistics, prices, phone numbers or names. General wording (hooks, calls to action) is fine.\n' +
       'Choose ' + n + ' scenes in a good story order (usually: hook or title first, then content scenes, then a cta or details scene, and outro last). Available scene types and their fields:\n' + types + '\n' +
       'Multi-line fields use \\n between lines. Keep every text short (titles under 6 words, list lines under 8 words). Each scene may also have "say": one natural sentence a narrator reads for that scene (in the same language).\n' +
-      'Also pick "theme" from: neon, social, gold, green, news, promo, sunset, rose, ocean (green for religious, gold or rose for weddings, news for issues and awareness, promo for sales, neon or social for workshops and social media), and "mood" from: calm, happy, travel, emotional, islamic, epic, party. Give a short "name" for the project and "org" (the organisation or person name if stated, else "").\n' +
-      'Return JSON only: {"name":"","org":"","theme":"","mood":"","ticker":"","scenes":[{"type":"","data":{},"say":""}]} where ticker is a news-ticker sentence only for news-style videos, else "".';
+      'Choose the editing "look" that best fits the request (do not always pick the same one): ' + (o.look ? 'USE EXACTLY "' + o.look + '".' : LOOKS) + '\n' + 'Also pick "theme" from: neon, social, gold, green, news, promo, sunset, rose, ocean (green for religious, gold or rose for weddings, news for issues and awareness, promo for sales, neon or social for workshops and social media), and "mood" from: calm, happy, travel, emotional, islamic, epic, party. Give a short "name" for the project and "org" (the organisation or person name if stated, else "").\n' +
+      'Return JSON only: {"name":"","org":"","look":"","theme":"","mood":"","ticker":"","scenes":[{"type":"","data":{},"say":""}]} where ticker is a news-ticker sentence only for news-style videos, else "".';
     const ms = AI.models().slice().sort((a, b) => (/lite/.test(b) ? 1 : 0) - (/lite/.test(a) ? 1 : 0)); let lastE = null; /* lighter models answer faster, so the connection is less likely to drop */
     for (let i = 0; i < Math.min(3, ms.length); i++) {
       try {
-        const j = await gen({ contents: [{ parts: [{ text: p }] }], generationConfig: { responseMimeType: 'application/json', temperature: .7, maxOutputTokens: 8192 } }, ms.slice(i), signal);
+        const j = await gen({ contents: [{ parts: [{ text: p }] }], generationConfig: { responseMimeType: 'application/json', temperature: .9, maxOutputTokens: 8192 } }, ms.slice(i), signal);
         const r = parseJson(textOf(j)); if (!r || !Array.isArray(r.scenes) || !r.scenes.length) throw err('parse', 'no scenes in the answer'); return r;
       } catch (e) { lastE = e; if (e.kind !== 'parse') throw e; }
     }
@@ -194,18 +196,18 @@
       '3. Timeline items are either designed text scenes {"kind":"card","type":"...","data":{...},"say":""} or media clips {"kind":"clip","i":<clip index>,"moment":<0,1 or 2 = which of its frames shows the best moment (videos only)>,"len":<seconds 2 to 5>,"motion":"' + mots.join('|') + '","fx":"none|slow|punch","caption":{"text":"","pos":"bottom|center|top"}}. A caption is a short overlay line on that clip (for example one of the quotes, or a topic name). Not every clip needs a caption; avoid more than one caption in a row of three clips.\n' +
       '4. Use "slow" for emotional or key moments, "punch" for energetic ones, and keep most clips "none". Use motion "kenburns" or "slowzoom" on photos and "none" on most videos.\n' +
       '5. Text scenes use these types and fields (multi-line fields use \\n between lines; keep texts short):\n' + types + '\n' +
-      '6. "media_style": "full" if the direction is a recap, aftermovie, reel, memories or highlight video (clips fill the screen and text overlays them), otherwise "frame" (clips sit inside a neon frame).\n' +
+      '6. EDITING LOOK: choose the "look" that fits this direction and these clips (' + (o.look ? 'USE EXACTLY "' + o.look + '"' : 'do NOT default to cinematic; read the mood of the direction: energetic or fun means energetic/party/hype, wedding means elegant, religious means islamic, news or awareness or government update means news, memories means nostalgic') + '). Looks: ' + LOOKS + '. Optionally override "filter", "overlay" and a "transitions" list (4 to 6 names) using: ' + FXLISTS + '. You may set "transition" on a clip item. "media_style": "full" (clips fill the screen, text overlays) or "frame" (clips inside a neon frame; best for news/awareness).\n' +
       '7. All text you write yourself must be in ' + lang + '; quoted texts stay exactly as given. Pick "theme" from: neon, social, gold, green, news, promo, sunset, rose, ocean and "mood" from: calm, happy, travel, emotional, islamic, epic, party.\n' +
       '8. "checklist": one entry per instruction in the direction, {"req":"short name of the instruction","how":"where/how you applied it, or why it cannot be done by this app"}. Be honest: this app cannot do real speed ramping, face-expression detection or camera moves beyond zoom/pan.\n' +
       'Target length: about ' + (o.target || 45) + ' seconds in total.\n' +
-      'Return JSON only: {"name":"","org":"","theme":"","mood":"","media_style":"full","ticker":"","timeline":[...],"checklist":[{"req":"","how":""}]}';
+      'Return JSON only: {"name":"","org":"","look":"","filter":"","overlay":"","transitions":[],"theme":"","mood":"","media_style":"full","ticker":"","timeline":[...],"checklist":[{"req":"","how":""}]}';
     const parts = [{ text: head }];
     clips.forEach((c, i) => { parts.push({ text: 'Clip ' + i + (c.kind === 'v' ? ' (video ' + Math.round(c.dur) + 's, frames 0..' + Math.max(0, (c.frames || []).length - 1) + ')' : ' (photo)') + ':' }); (c.frames || []).forEach(f => parts.push({ inline_data: { mime_type: 'image/jpeg', data: f.split(',')[1] } })); });
     const ms = AI.models().slice().sort((a, b) => (/lite/.test(b) ? 1 : 0) - (/lite/.test(a) ? 1 : 0)); let lastE = null;
     /* a thinking model on many images is slow; try a lighter one first, then the stronger ones */
     for (let i = 0; i < Math.min(3, ms.length); i++) {
       try {
-        const j = await gen({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json', temperature: .6, maxOutputTokens: 12000 } }, ms.slice(i), signal);
+        const j = await gen({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json', temperature: .85, maxOutputTokens: 12000 } }, ms.slice(i), signal);
         const r = parseJson(textOf(j)); if (!r || !Array.isArray(r.timeline) || !r.timeline.length) throw err('parse', 'no timeline in the answer'); return r;
       } catch (e) { lastE = e; if (e.kind !== 'parse') throw e; }
     }

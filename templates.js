@@ -178,10 +178,11 @@
   TP.buildAI = function (r, o) {
     o = o || {}; const p = P.newProject(), TY = C.TYPES;
     p.fmt = o.fmt || '9:16'; p.res = o.res || 720; p.credit = o.credit !== false; p.fit = 'fit'; p.autoColor = true; p.style = 'cinema'; p.kind = 'promo'; p.tpl = 'ai';
-    p.theme = C.THEMES[r.theme] ? r.theme : 'neon'; p.name = String(r.name || o.prompt || 'Video').slice(0, 40);
+    const LK = TP.LOOKS[o.look && TP.LOOKS[o.look] ? o.look : r.look] || TP.LOOKS.cinematic, rnd = rng(o.seed || Date.now()); p.look = Object.keys(TP.LOOKS).find(k => TP.LOOKS[k] === LK); p.overlay = FXN(r.overlay, 'OVL') || LK.ovl; p.overlayAmt = .7;
+    p.theme = C.THEMES[r.theme] ? r.theme : LK.theme; p.name = String(r.name || o.prompt || 'Video').slice(0, 40);
     const br = Object.assign(TP.brand(), o.brand || {}), org = String(r.org || '').trim() || br.name || '';
     p.brand = { on: o.brandOn !== false && !!(org || br.logo || br.header || br.footer), name: org, header: br.header || '', footer: br.footer || org, logo: br.logo || '' };
-    const TRS2 = ['fade', 'slideL', 'zoomIn', 'dissolve', 'wipeL', 'pushL']; let idx = 0; const cards = [];
+    const TRS2 = TP.shuffle(LK.trans, rnd); let idx = 0; const cards = [];
     (r.scenes || []).slice(0, 10).forEach(sc => {
       const type = String(sc.type || ''); if (!TY[type]) return; const ok = {}; C.fields(type).forEach(f => { ok[f.k] = 1; }); const ov = {};
       Object.keys(sc.data || {}).forEach(k => { if (ok[k] && sc.data[k] !== undefined && sc.data[k] !== null) ov[k] = String(sc.data[k]).replace(/\\n/g, '\n'); });
@@ -204,9 +205,32 @@
     const at = Math.min(1, cards.length - 1); p.clips = cards.slice(0, at).concat(mc, cards.slice(at));
     if (r.ticker && String(r.ticker).trim()) p.ticker = { on: true, label: S.lang === 'ur' ? 'تازہ' : 'LIVE', text: String(r.ticker).trim() };
     const m = o.music || 'auto'; const moods = ['calm', 'happy', 'travel', 'emotional', 'islamic', 'epic', 'party'];
-    p.music = m === 'none' ? { kind: 'none' } : m === 'file' && o.musicFile ? { kind: 'file', file: o.musicFile, mood: 'calm', vol: .5, start: 0, duck: true } : { kind: 'synth', mood: m === 'auto' ? (moods.indexOf(r.mood) >= 0 ? r.mood : 'happy') : m, seed: 1, vol: .5, start: 0, duck: true };
+    p.music = m === 'none' ? { kind: 'none' } : m === 'file' && o.musicFile ? { kind: 'file', file: o.musicFile, mood: 'calm', vol: .5, start: 0, duck: true } : { kind: 'synth', mood: m === 'auto' ? (moods.indexOf(r.mood) >= 0 ? r.mood : LK.mood) : m, seed: 1, vol: .5, start: 0, duck: true };
     P.layout(p); p.clips.forEach(c => { if (c.kind === 'c') c.thumb = C.thumb(c, p, { logo: p.brand.logo }); }); return p;
   };
+
+
+  /* ---------------- looks: complete editing styles (pace, transitions, grading, captions, overlays) ---------------- */
+  const cap = (o) => Object.assign({ font: 'sans', size: 6.2, bg: 'rgba(0,0,0,.42)', color: '#ffffff', stroke: '', in: 'slideU', mid: 'none', out: 'fade', y: .78, bold: true }, o);
+  TP.LOOKS = {
+    cinematic: { n: b('سنیماٹک (پریمیم)', 'Cinematic premium'), d: 'slow, elegant, premium aftermovie, calm zooms, dips and dissolves', pace: 1.15, fit: 'blur', filter: 'cinematic', fa: .8, ovl: 'vignette', trans: ['fade', 'dissolve', 'dipBlack', 'slideL', 'blur'], mot: ['kenburns', 'slowzoom'], cap: cap({ in: 'slideU', size: 6 }), theme: 'neon', mood: 'epic', full: 1 },
+    energetic: { n: b('تیز ریل / ٹک ٹاک', 'Energetic reel'), d: 'fast cuts, punchy zooms, glitch and flash, bold bouncing captions', pace: .62, fit: 'fill', filter: 'vivid', fa: .9, ovl: 'none', trans: ['glitch', 'flash', 'zoomIn', 'spin', 'pushL', 'zoomOut'], mot: ['pulse', 'kenburns', 'shake'], cap: cap({ in: 'bounce', mid: 'glow', size: 8, y: .5, bg: '', stroke: '#000000' }), theme: 'social', mood: 'party', full: 1, cut: 1, punch: .35 },
+    elegant: { n: b('خوبصورت / شادی', 'Elegant / wedding'), d: 'slow romantic, golden tones, soft dissolves, petals or bokeh, serif captions', pace: 1.3, fit: 'blur', filter: 'golden', fa: .8, ovl: 'bokeh', trans: ['dissolve', 'fade', 'circleOpen', 'dipWhite'], mot: ['slowzoom', 'kenburns'], cap: cap({ font: 'serif', in: 'fade', out: 'fade', size: 6.4, bg: '', stroke: '#000000', color: '#fff1c1' }), theme: 'gold', mood: 'emotional', full: 1 },
+    news: { n: b('خبر / آگاہی', 'News / awareness'), d: 'serious, informative, wipes and slides, ticker, bar captions', pace: .95, fit: 'blur', filter: 'none', fa: 1, ovl: 'none', trans: ['wipeL', 'slideL', 'pushL', 'diagWipe', 'wipeR'], mot: ['kenburns', 'none'], cap: cap({ in: 'slideL', size: 6, bg: 'rgba(200,16,40,.92)', y: .8 }), theme: 'news', mood: 'epic', full: 0, ticker: 1 },
+    corporate: { n: b('کارپوریٹ صاف', 'Corporate clean'), d: 'professional, clean, balanced slides and fades, neutral colours', pace: 1, fit: 'blur', filter: 'none', fa: 1, ovl: 'none', trans: ['slideL', 'pushL', 'fade', 'wipeL'], mot: ['kenburns', 'slowzoom', 'none'], cap: cap({ in: 'slideU', size: 6 }), theme: 'ocean', mood: 'calm', full: 0 },
+    islamic: { n: b('اسلامی / پرسکون', 'Islamic / peaceful'), d: 'calm and respectful, green and gold, soft fades, stars', pace: 1.3, fit: 'blur', filter: 'soft', fa: .8, ovl: 'stars', trans: ['fade', 'dissolve', 'dipWhite', 'circleOpen'], mot: ['slowzoom', 'kenburns'], cap: cap({ font: 'naskh', in: 'fade', size: 6.6, bg: 'rgba(0,40,30,.55)', color: '#ffe9a8' }), theme: 'green', mood: 'islamic', full: 1 },
+    party: { n: b('پارٹی / جشن', 'Party / celebration'), d: 'colourful, joyful, confetti, quick flashy transitions, pop captions', pace: .75, fit: 'fill', filter: 'vivid', fa: .9, ovl: 'confetti', trans: ['flash', 'spin', 'zoomIn', 'heart', 'checker', 'pushU'], mot: ['pulse', 'kenburns'], cap: cap({ in: 'pop', size: 7.6, y: .72, bg: '', stroke: '#6a1b9a', color: '#fff7a8' }), theme: 'rose', mood: 'party', full: 1, cut: 1 },
+    documentary: { n: b('ڈاکومنٹری', 'Documentary'), d: 'slow observational, film grain, muted colour, subtle captions', pace: 1.35, fit: 'blur', filter: 'fade', fa: .9, ovl: 'film', trans: ['dissolve', 'fade', 'dipBlack'], mot: ['kenburns', 'slowzoom', 'none'], cap: cap({ font: 'mono', in: 'type', size: 5.4, bg: 'rgba(0,0,0,.3)', y: .86 }), theme: 'social', mood: 'calm', full: 1 },
+    vlog: { n: b('ٹریول / وی لاگ', 'Travel / vlog'), d: 'warm, friendly, lively slides and zooms, light leaks, handwritten captions', pace: .9, fit: 'fill', filter: 'warm', fa: .9, ovl: 'lightleak', trans: ['slideL', 'slideU', 'blur', 'zoomOut', 'pushR'], mot: ['kenburns', 'sway'], cap: cap({ font: 'hand', in: 'words', size: 7.2, bg: '', stroke: '#000000' }), theme: 'sunset', mood: 'travel', full: 1 },
+    nostalgic: { n: b('پرانی یادیں', 'Nostalgic memories'), d: 'vintage film, warm sepia, slow dissolves, grain', pace: 1.25, fit: 'blur', filter: 'vintage', fa: .9, ovl: 'film', trans: ['dissolve', 'fade', 'dipBlack', 'blur'], mot: ['slowzoom', 'sway'], cap: cap({ font: 'serif', in: 'fade', size: 6.2, bg: '', stroke: '#000000', color: '#ffe9c7' }), theme: 'rose', mood: 'emotional', full: 1 },
+    hype: { n: b('ہائپ / کھیل', 'Hype / sports'), d: 'aggressive, high energy, shakes, glitches and flashes, dramatic contrast', pace: .6, fit: 'fill', filter: 'dramatic', fa: .9, ovl: 'sparks', trans: ['glitch', 'flash', 'zoomIn', 'pushU', 'spin'], mot: ['shake', 'pulse'], cap: cap({ font: 'mono', in: 'zoom', mid: 'glow', size: 8.4, y: .5, bg: '', stroke: '#000000', color: '#35d6ff' }), theme: 'neon', mood: 'epic', full: 1, cut: 1, punch: .45 },
+    minimal: { n: b('سادہ / مِنی مل', 'Minimal'), d: 'quiet, clean, simple fades, small captions, no effects', pace: 1.1, fit: 'blur', filter: 'none', fa: 1, ovl: 'none', trans: ['fade', 'dissolve'], mot: ['none', 'slowzoom'], cap: cap({ in: 'fade', size: 5.6, bg: '', stroke: '#000000' }), theme: 'social', mood: 'calm', full: 1 }
+  };
+  TP.LOOK_IDS = Object.keys(TP.LOOKS);
+  TP.lookName = id => pk(TP.LOOKS[id].n);
+  const rng = seed => { let s = seed >>> 0 || 1; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; };
+  const FX_ = S.fx, FXN = (v, tbl) => (v && FX_[tbl][v] ? v : null);
+  TP.shuffle = (a, rnd) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; };
 
   /* ---------------- AI Director: build the timeline from the plan ---------------- */
   const norm = t => String(t || '').toLowerCase().replace(/[\u{1F000}-\u{1FFFF}☀-➿️]/gu, '').replace(/[^\p{L}\p{N}]+/gu, '');
@@ -219,14 +243,16 @@
   TP.buildDirector = function (r, o) {
     o = o || {}; const media = (o.media || []).slice(0, 24), CX = C.THEMES;
     const p = P.newProject(); p.fmt = o.fmt || '9:16'; p.res = o.res || 720; p.credit = o.credit !== false; p.fit = 'blur'; p.autoColor = true; p.style = 'cinema'; p.kind = 'promo'; p.tpl = 'director';
-    p.theme = CX[r.theme] ? r.theme : 'neon'; p.name = String(r.name || 'Video').slice(0, 40);
+    const LK = TP.LOOKS[o.look && TP.LOOKS[o.look] ? o.look : r.look] || TP.LOOKS.cinematic, rnd = rng(o.seed || Date.now());
+    p.look = Object.keys(TP.LOOKS).find(k => TP.LOOKS[k] === LK); p.fit = LK.fit; p.filter = FXN(r.filter, 'FILTERS') || LK.filter; p.filterAmt = LK.fa; p.overlay = FXN(r.overlay, 'OVL') || LK.ovl; p.overlayAmt = .7;
+    p.theme = CX[r.theme] ? r.theme : LK.theme; p.name = String(r.name || 'Video').slice(0, 40);
     const br = Object.assign(TP.brand(), o.brand || {}), org = String(r.org || '').trim() || br.name || '';
-    p.brand = { on: o.brandOn !== false && !!(br.logo || br.header || br.footer || (org && r.media_style === 'frame')), name: org, header: br.header || '', footer: br.footer || org, logo: br.logo || '' };
+    p.brand = { on: o.brandOn !== false && !!(br.logo || br.header || br.footer || (org && !LK.full)), name: org, header: br.header || '', footer: br.footer || org, logo: br.logo || '' };
     const moods = ['calm', 'happy', 'travel', 'emotional', 'islamic', 'epic', 'party']; const m = o.music || 'auto';
-    p.music = m === 'none' ? { kind: 'none' } : m === 'file' && o.musicFile ? { kind: 'file', file: o.musicFile, mood: 'calm', vol: .5, start: 0, duck: true } : { kind: 'synth', mood: m === 'auto' ? (moods.indexOf(r.mood) >= 0 ? r.mood : 'epic') : m, seed: 1, vol: .5, start: 0, duck: true };
-    const beat = p.music.kind === 'synth' ? 60 / S.music.bpm(p.music.mood) : 0, full = r.media_style !== 'frame';
-    const TRS2 = full ? ['fade', 'dissolve', 'slideL', 'zoomIn', 'fade', 'pushL'] : ['fade', 'slideL', 'zoomIn', 'dissolve', 'wipeL', 'pushL']; let ti = 0;
-    const used = {}, items = [], texts = [], allText = []; const MOT = { kenburns: 'kenburns', slowzoom: 'slowzoom', pulse: 'pulse', sway: 'sway' };
+    p.music = m === 'none' ? { kind: 'none' } : m === 'file' && o.musicFile ? { kind: 'file', file: o.musicFile, mood: 'calm', vol: .5, start: 0, duck: true } : { kind: 'synth', mood: m === 'auto' ? (moods.indexOf(r.mood) >= 0 ? r.mood : LK.mood) : m, seed: 1, vol: .5, start: 0, duck: true };
+    const beat = p.music.kind === 'synth' ? 60 / S.music.bpm(p.music.mood) : 0, full = r.media_style ? r.media_style !== 'frame' : !!LK.full; if (o.look) full = !!LK.full;
+    const okT = (r.transitions || []).filter(x => FX_.TR[x]), TRS2 = TP.shuffle(okT.length >= 3 ? okT : LK.trans, rnd); let ti = 0;
+    const used = {}, items = [], texts = [], allText = []; const MOT = { kenburns: 'kenburns', slowzoom: 'slowzoom', pulse: 'pulse', sway: 'sway', shake: 'shake' }, pickMot = () => LK.mot[Math.floor(rnd() * LK.mot.length)];
     const mkCard = sc => {
       const type = String(sc.type || ''); if (!C.TYPES[type]) return null; const ok = {}; C.fields(type).forEach(f => { ok[f.k] = 1; }); const ov = {};
       Object.keys(sc.data || {}).forEach(k => { if (ok[k] && sc.data[k] != null) ov[k] = String(sc.data[k]).replace(/\\n/g, '\n'); });
@@ -236,19 +262,21 @@
       c.card.data.say = String(sc.say || '').trim(); const tl = Object.values(c.card.data).join(' ').length; c.len = Math.max(3, Math.min(7, c.len * .6 + tl / 70)); allText.push(Object.values(c.card.data).join(' ')); return c;
     };
     const mkClip = it => {
-      const i = Math.floor(+it.i), src = media[i]; if (!src) return null; const first = !used[i]; used[i] = 1; const c = first ? src : cloneClip(src);
-      let L = Math.max(1.6, Math.min(6, +it.len || 3)); const fx = it.fx === 'slow' || it.fx === 'punch' ? it.fx : 'none';
-      c.anim = { in: 'none', mid: MOT[it.motion] || (c.kind === 'i' ? 'kenburns' : 'none'), out: 'none' }; c.vfx = fx === 'punch' ? 'punch' : 'none'; c.speed = 1;
+      const i = Math.floor(+it.i), src = media[i]; if (!src) return null; const first = !used[i]; used[i] = 1; const c = first ? src : cloneClip(src); c._mi = i;
+      let L = Math.max(1.2, Math.min(6.5, (+it.len || 3) * LK.pace)); const fx = it.fx === 'slow' || it.fx === 'punch' ? it.fx : 'none';
+      c.anim = { in: 'none', mid: MOT[it.motion] && it.motion !== 'none' ? MOT[it.motion] : (c.kind === 'i' || it.motion !== 'none' ? pickMot() : 'none'), out: 'none' }; c.vfx = fx === 'punch' || (fx === 'none' && LK.punch && rnd() < LK.punch) ? 'punch' : 'none'; c.speed = 1;
       if (c.kind === 'v') {
         const ft = (c.frameT && c.frameT.length) ? c.frameT[Math.max(0, Math.min(c.frameT.length - 1, Math.floor(+it.moment) || 0))] : c.dur / 2; const sp = fx === 'slow' ? .6 : 1;
         L = Math.min(L, c.dur / sp); const span = L * sp; let a = Math.max(0, Math.min(c.dur - span, ft - span / 2)); c.in = a; c.out = Math.min(c.dur, a + span); c.speed = sp; c.mute = p.music.kind !== 'none'; c.len = (c.out - c.in) / sp;
       } else { c.len = Math.min(L, 4); }
-      c.trans = { type: TRS2[ti++ % TRS2.length], dur: .5 };
+      c.trans = { type: it.transition && FX_.TR[it.transition] ? it.transition : TRS2[ti++ % TRS2.length], dur: LK.pace < .8 ? .3 : .5 };
       if (!full) { c.hl = { on: true, chip: '', title: '', num: 0, sub: '', chips: '' }; if (it.chip) c.hl.chip = String(it.chip); if (it.title) c.hl.title = String(it.title); }
-      const cap = it.caption && String(it.caption.text || '').trim(); if (cap) { const pos = it.caption.pos === 'top' ? .2 : it.caption.pos === 'center' ? .5 : .78; texts.push({ clip: c.id, text: cap, y: pos }); allText.push(cap); }
+      const cap = it.caption && String(it.caption.text || '').trim(); if (cap) { const pos = it.caption.pos === 'top' ? .2 : it.caption.pos === 'center' ? .5 : it.caption.pos === 'bottom' ? Math.max(.7, LK.cap.y) : LK.cap.y; texts.push({ clip: c.id, text: cap, y: pos }); allText.push(cap); }
       return c;
     };
     (r.timeline || []).slice(0, 40).forEach(it => { const c = it.kind === 'clip' ? mkClip(it) : mkCard(it); if (c) { if (c.kind === 'c') c.trans = { type: TRS2[ti++ % TRS2.length], dur: .5 }; items.push(c); } });
+    /* fast looks: cut long videos into a second, different moment for more energy */
+    if (LK.cut) { const ex = []; items.forEach((c, idx) => { if (c.kind === 'v' && c.dur > 6 && c._mi !== undefined && ex.length < 6) { const n = mkClip({ i: c._mi, moment: c.frameT && c.frameT.length > 2 ? 2 : 0, len: 2, motion: 'pulse', fx: 'none' }); if (n && n.in !== c.in) ex.push([Math.min(items.length, idx + 2 + ex.length), n]); } }); ex.sort((a, b) => b[0] - a[0]).forEach(([pos, n]) => items.splice(pos, 0, n)); }
     /* coverage: every clip appears at least once */
     const unused = media.map((c, i) => i).filter(i => !used[i]); const added = unused.length;
     unused.forEach((i, k) => { const c = mkClip({ i, moment: 1, len: 2.6, motion: 'kenburns' }); const pos = Math.max(1, Math.min(items.length - 1, Math.round((k + 1) * items.length / (unused.length + 1)))); items.splice(pos, 0, c); });
@@ -263,10 +291,11 @@
       if (c.kind === 'c') { if (beat) c.len = Math.max(2, Math.round(c.len / beat)) * beat; return; }
       let v = Math.min(5.5, Math.max(1.4, c.len * k)); if (beat) v = Math.max(2, Math.round(v / beat)) * beat; if (c.kind === 'v') { v = Math.min(v, c.dur / c.speed); c.out = Math.min(c.dur, c.in + v * c.speed); c.len = (c.out - c.in) / c.speed; } else c.len = v;
     });
-    p.clips = items; p.texts = texts.map(t => P.newText({ clip: t.clip, text: t.text, y: t.y, size: 6.2, bg: 'rgba(0,0,0,.42)', in: 'slideU', out: 'fade' }));
+    items.forEach(c => { delete c._mi; });
+    p.clips = items; p.texts = texts.map(t => P.newText({ clip: t.clip, text: t.text, y: t.y, size: LK.cap.size, font: LK.cap.font, bg: LK.cap.bg, color: LK.cap.color, stroke: LK.cap.stroke, bold: LK.cap.bold, in: LK.cap.in, mid: LK.cap.mid, out: LK.cap.out }));
     if (r.ticker && String(r.ticker).trim()) p.ticker = { on: true, label: S.lang === 'ur' ? 'تازہ' : 'LIVE', text: String(r.ticker).trim() };
     P.layout(p); p.clips.forEach(c => { if (c.kind === 'c') c.thumb = C.thumb(c, p, { logo: p.brand.logo }); });
-    const rep = []; const nu = Object.keys(used).length;
+    const rep = ['🎞️ ' + (S.lang === 'ur' ? 'انداز: ' : 'Look: ') + TP.lookName(p.look) + ' · ' + (p.filter !== 'none' ? p.filter + ' · ' : '') + (p.overlay !== 'none' ? p.overlay + ' · ' : '') + (S.lang === 'ur' ? 'ٹرانزیشن: ' : 'transitions: ') + Array.from(new Set(p.clips.map(c => c.trans && c.trans.type))).slice(0, 5).join(', ')]; const nu = Object.keys(used).length;
     rep.push('✅ ' + (S.lang === 'ur' ? 'تصاویر/ویڈیوز استعمال ہوئیں: ' : 'Clips used: ') + Math.min(media.length, nu + added) + '/' + media.length + (added ? ' (' + (S.lang === 'ur' ? 'باقی خود شامل کیں' : 'the rest were added automatically') + ')' : ''));
     if (need.length) rep.push((missing.length ? '⚠️' : '✅') + ' ' + (S.lang === 'ur' ? 'آپ کے اقتباس والی لائنیں: ' : 'Your quoted lines on screen: ') + (need.length - missing.length) + '/' + need.length + (missing.length ? ' (' + (S.lang === 'ur' ? 'باقی الگ سین میں ڈالیں' : 'the rest were added as text scenes') + ')' : ''));
     (r.checklist || []).slice(0, 14).forEach(x => { if (x && x.req) rep.push('• ' + String(x.req).slice(0, 60) + ' → ' + String(x.how || '').slice(0, 110)); });

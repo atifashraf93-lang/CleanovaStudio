@@ -172,7 +172,7 @@
     ['💍', 'ولیمہ', 'Walima', 'احمد اور سارہ کے ولیمہ کی دعوت، ہفتہ 20 دسمبر شام 7 بجے، رائل ہال لاہور', 'Walima invitation for Ahmed and Sara, Saturday 20 December at 7 PM, Royal Hall Lahore'],
     ['🛍️', 'سیل', 'Sale', 'ہماری کپڑوں کی دکان پر 40 فیصد سیل، ہفتے تک، دکان مین بازار سیالکوٹ', 'Clothes shop 40% off sale until Sunday, Main Bazaar Sialkot'],
     ['🚨', 'آگاہی', 'Awareness', 'ہماری گلی میں پانی کی قلت کا مسئلہ، دو ہفتے سے پانی نہیں آ رہا، انتظامیہ سے مطالبہ ہے کہ فوری حل کرے', 'Water shortage in our street, no water for two weeks, we demand the authorities fix it urgently']];
-  function newAV() { const br = TP.brand(), sv = S.get('wiz', {}); AV = { prompt: '', lang: S.lang === 'ur' ? 'ur' : 'en', size: 'mid', media: [], loading: 0, fmt: sv.fmt || '9:16', res: S.get('res', 720), music: 'auto', musicFile: null, voice: 'none', gvoice: 'Kore', brandOn: true, credit: S.get('credit', true) !== false }; }
+  function newAV() { const br = TP.brand(), sv = S.get('wiz', {}); AV = { prompt: '', lang: S.lang === 'ur' ? 'ur' : 'en', size: 'mid', look: '', media: [], loading: 0, fmt: sv.fmt || '9:16', res: S.get('res', 720), music: 'auto', musicFile: null, voice: 'none', gvoice: 'Kore', brandOn: true, credit: S.get('credit', true) !== false }; }
   SCR.aivid = async function () {
     if (!AV) newAV(); MS = AV; const aiOn = AI.enabled();
     const moodItems = [['auto', tt('خود', 'Auto')]].concat(S.music.list.map(m => [m, S.music.MOODS[m].n[S.lang === 'ur' ? 0 : 1]])).concat([['file', AV.musicFile ? '🎵 ' + AV.musicFile.name.slice(0, 14) : tt('میرا گانا', 'My own song')], ['none', tt('بغیر موسیقی', 'No music')]]);
@@ -182,7 +182,8 @@
       '<div class="acts"><button id="avmic">🎤 ' + tt('بول کر لکھیں', 'Speak your prompt') + '</button></div>' +
       '<div class="mut">' + tt('جتنی تفصیل (نام، تاریخ، جگہ، فون) دیں گے ویڈیو اتنی درست بنے گی۔ جو نہیں بتائیں گے وہ ایپ خود نہیں گھڑے گی۔', 'The more detail you give (names, date, place, phone) the better. Anything you leave out is not invented.') + '</div>' +
       '<div class="lbl">' + tt('مثالیں (چھو کر بھریں)', 'Examples (tap to fill)') + '</div><div class="chips">' + AV_EX.map((x, i) => '<button class="chip" data-ex="' + i + '">' + x[0] + ' ' + x[S.lang === 'ur' ? 1 : 2] + '</button>').join('') + '</div></div>' +
-      '<div class="card"><h3>2️⃣ ' + tt('زبان اور لمبائی', 'Language and length') + '</h3>' + chips([['ur', 'اردو'], ['roman', 'Roman Urdu'], ['en', 'English']], AV.lang, 'lng') + chips([['short', tt('چھوٹی', 'Short')], ['mid', tt('درمیانی', 'Medium')], ['long', tt('لمبی', 'Long')]], AV.size, 'siz') + '</div>' +
+      '<div class="card"><h3>2️⃣ ' + tt('زبان اور لمبائی', 'Language and length') + '</h3>' + chips([['ur', 'اردو'], ['roman', 'Roman Urdu'], ['en', 'English']], AV.lang, 'lng') + chips([['short', tt('چھوٹی', 'Short')], ['mid', tt('درمیانی', 'Medium')], ['long', tt('لمبی', 'Long')]], AV.size, 'siz') +
+      '<div class="lbl">' + tt('ایڈیٹنگ کا انداز', 'Editing style') + '</div>' + chips([['', '🤖 ' + tt('AI خود چنے', 'AI chooses')]].concat(TP.LOOK_IDS.map(k => [k, TP.lookName(k)])), AV.look, 'lok') + '<div class="mut">' + tt('خود چنے تو ہر پرامپٹ کے لیے الگ انداز بنتا ہے۔', 'On auto, each prompt gets its own style.') + '</div></div>' +
       '<div class="card"><h3>3️⃣ ' + tt('اپنی تصاویر / ویڈیو (اختیاری)', 'Your photos / videos (optional)') + '</h3><div id="tm"></div><input type="file" id="tfm" accept="image/*,video/*" multiple hidden></div>' +
       '<div class="card"><h3>4️⃣ ' + tt('موسیقی، آواز، فارمیٹ', 'Music, voice, format') + '</h3>' + chips(moodItems, AV.music, 'mus') + '<input type="file" id="tmf" accept="audio/*" hidden>' +
       '<div class="lbl">' + tt('وائس اوور', 'Voice-over') + '</div>' + chips([['none', tt('نہیں', 'None')], ['phone', tt('فون کی آواز', 'Phone voice')], ['gemini', tt('AI آواز', 'AI voice')]], AV.voice, 'voi') + (AV.voice === 'gemini' ? chips(AI.VOICES, AV.gvoice, 'gv') : '') +
@@ -193,6 +194,7 @@
     $('#avp').oninput = e => { AV.prompt = e.target.value; };
     $('#avmic').onclick = speakPrompt;
     $$('[data-ex]').forEach(b => b.onclick = () => { const x = AV_EX[+b.dataset.ex]; AV.prompt = x[S.lang === 'ur' ? 3 : 4]; AV.lang = S.lang === 'ur' ? 'ur' : 'en'; SCR.aivid(); });
+    $$('[data-lok]').forEach(b => b.onclick = () => { AV.look = b.dataset.lok; SCR.aivid(); });
     $$('[data-lng]').forEach(b => b.onclick = () => { AV.lang = b.dataset.lng; SCR.aivid(); }); $$('[data-siz]').forEach(b => b.onclick = () => { AV.size = b.dataset.siz; SCR.aivid(); });
     $('#tfm').onchange = e => { addTplMedia(e.target.files); e.target.value = ''; };
     $('#tmf').onchange = e => { const f = e.target.files[0]; if (f) { AV.musicFile = f; AV.music = 'file'; SCR.aivid(); } };
@@ -228,14 +230,14 @@
       if (AV.media.length) {
         msg(tt('AI آپ کی تصاویر اور ویڈیوز دیکھ رہا ہے…', 'The AI is looking at your photos and videos…'), .12);
         const target = TP.targetSeconds(AV.prompt, AV.size);
-        const r = await AI.direct({ prompt: AV.prompt.trim(), lang: AV.lang, target, clips: AV.media.slice() }, ac.signal); if (ac.signal.aborted) return;
+        const r = await AI.direct({ prompt: AV.prompt.trim(), lang: AV.lang, target, look: AV.look, clips: AV.media.slice() }, ac.signal); if (ac.signal.aborted) return;
         msg(tt('ٹائم لائن بنا رہا ہوں…', 'Building the timeline…'), .5); await S.sleep(30);
-        p = TP.buildDirector(r, { prompt: AV.prompt, target, fmt: AV.fmt, res: AV.res, music: AV.music, musicFile: AV.musicFile, media: AV.media.slice(), credit: AV.credit, brandOn: AV.brandOn });
+        p = TP.buildDirector(r, { prompt: AV.prompt, look: AV.look, target, fmt: AV.fmt, res: AV.res, music: AV.music, musicFile: AV.musicFile, media: AV.media.slice(), credit: AV.credit, brandOn: AV.brandOn });
       } else {
         msg(tt('AI آپ کی بات سمجھ کر سین بنا رہا ہے…', 'The AI is planning your scenes…'), .15);
-        const r = await AI.makeVideo({ prompt: AV.prompt.trim(), lang: AV.lang, size: AV.size }, ac.signal); if (ac.signal.aborted) return;
+        const r = await AI.makeVideo({ prompt: AV.prompt.trim(), lang: AV.lang, size: AV.size, look: AV.look }, ac.signal); if (ac.signal.aborted) return;
         msg(tt('ڈیزائن بنا رہا ہوں…', 'Designing…'), .5); await S.sleep(30);
-        p = TP.buildAI(r, { prompt: AV.prompt, fmt: AV.fmt, res: AV.res, music: AV.music, musicFile: AV.musicFile, media: [], credit: AV.credit, brandOn: AV.brandOn });
+        p = TP.buildAI(r, { prompt: AV.prompt, look: AV.look, fmt: AV.fmt, res: AV.res, music: AV.music, musicFile: AV.musicFile, media: [], credit: AV.credit, brandOn: AV.brandOn });
       }
       if (AV.voice !== 'none') {
         msg(tt('آواز بنا رہا ہوں…', 'Making the voice-over…'), .6);
